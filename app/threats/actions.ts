@@ -169,7 +169,7 @@ export async function checkAndIngestIp(
 
     const result = await db.insert(threatLogs)
       .values(record)
-      .onConflictDoNothing()
+      .onConflictDoNothing({ target: [threatLogs.indicator, threatLogs.source] })
       .returning({ id: threatLogs.id });
 
     ingested = result.length > 0;
