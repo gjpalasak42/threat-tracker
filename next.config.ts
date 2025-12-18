@@ -27,10 +27,6 @@ const nextConfig: NextConfig = {
             value: 'nosniff'
           },
           {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block'
-          },
-          {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin'
           },
