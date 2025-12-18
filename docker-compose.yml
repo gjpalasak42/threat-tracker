@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: threat-tracker-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-threat_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-threat_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-threat_tracker}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-threat_user} -d ${POSTGRES_DB:-threat_tracker}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-development}
+    container_name: threat-tracker-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-threat_user}:${POSTGRES_PASSWORD:-threat_pass}@db:5432/${POSTGRES_DB:-threat_tracker}
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Mount source for hot reloading in development
+      - .:/app:cached
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  postgres_data:
