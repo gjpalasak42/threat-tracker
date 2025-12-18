@@ -158,6 +158,7 @@ export async function checkIp(
  * @param confidenceMinimum - Minimum abuse confidence score (25-100, default 90)
  * @param limit - Maximum number of results (optional, depends on subscription)
  * @returns Array of blacklisted IPs with rate limit info
+ * @throws {Error} If the AbuseIPDB API request fails or the response cannot be parsed
  * @throws {RangeError} If confidenceMinimum is out of range
  */
 export async function getBlacklist(
