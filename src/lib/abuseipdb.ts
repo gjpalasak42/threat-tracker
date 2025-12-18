@@ -173,9 +173,18 @@ export async function getBlacklist(
   
   const apiKey = getApiKey();
   
+  // Validate limit if provided - must be a positive integer
+  if (limit !== undefined) {
+    if (!Number.isFinite(limit) || !Number.isInteger(limit) || limit <= 0) {
+      throw new RangeError(
+        `Invalid limit value: ${limit}. Expected a positive integer.`
+      );
+    }
+  }
+  
   const url = new URL(`${ABUSEIPDB_BASE_URL}/blacklist`);
   url.searchParams.set('confidenceMinimum', confidenceMinimum.toString());
-  if (limit) {
+  if (limit !== undefined) {
     url.searchParams.set('limit', limit.toString());
   }
 
