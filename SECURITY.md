@@ -61,7 +61,7 @@ When deploying Threat Tracker:
 
 Threat Tracker includes several security features:
 
-- Security headers (HSTS, X-Frame-Options, CSP, etc.)
+- Security headers (HSTS, X-Frame-Options, etc.)
 - Non-root container execution
 - Input validation and sanitization
 - Parameterized database queries (via Drizzle ORM)
