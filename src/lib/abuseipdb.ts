@@ -5,6 +5,8 @@
  * @see https://docs.abuseipdb.com/
  */
 
+import { isIP } from 'net';
+
 const ABUSEIPDB_BASE_URL = 'https://api.abuseipdb.com/api/v2';
 
 /**
@@ -109,7 +111,6 @@ export async function checkIp(
   }
   
   // Use Node.js net module for robust IP validation
-  const { isIP } = await import('net');
   if (isIP(ipAddress) === 0) {
     throw new Error(`Invalid IP address format: ${ipAddress}`);
   }
@@ -122,7 +123,7 @@ export async function checkIp(
     maxAgeInDays > 365
   ) {
     throw new RangeError(
-      `Invalid maxAgeInDays value: ${maxAgeInDays}. Expected an integer between 1 and 365.`
+      `Invalid maxAgeInDays value: ${maxAgeInDays}. Expected a finite integer between 1 and 365.`
     );
   }
   

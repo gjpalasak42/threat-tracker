@@ -14,6 +14,12 @@ import { desc, count } from 'drizzle-orm';
 const SOURCE_ABUSEIPDB = 'AbuseIPDB';
 
 /**
+ * IPv4-mapped IPv6 address prefix
+ * Used to detect IPv4 addresses in IPv6 format (e.g., ::ffff:192.0.2.1)
+ */
+const IPV4_MAPPED_IPV6_PREFIX = '::ffff:';
+
+/**
  * Ingestion result for tracking what was processed
  */
 export interface IngestionResult {
@@ -35,7 +41,7 @@ export interface IngestionResult {
  */
 function detectIpVersion(ip: string): 'ipv4' | 'ipv6' {
   // Check for IPv4-mapped IPv6 addresses
-  if (ip.toLowerCase().startsWith('::ffff:')) {
+  if (ip.toLowerCase().startsWith(IPV4_MAPPED_IPV6_PREFIX)) {
     return 'ipv4';
   }
   // Standard check: if it contains ':', it's IPv6; otherwise, IPv4
