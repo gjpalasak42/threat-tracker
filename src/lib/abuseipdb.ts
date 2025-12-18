@@ -116,6 +116,7 @@ export async function checkIp(
   }
   
   // Validate maxAgeInDays according to AbuseIPDB requirements (1-365)
+  // Must be an integer since days are discrete units
   if (
     !Number.isFinite(maxAgeInDays) ||
     !Number.isInteger(maxAgeInDays) ||
@@ -164,6 +165,7 @@ export async function getBlacklist(
   limit?: number
 ): Promise<{ data: AbuseIPDBBlacklistResponse['data']; meta: AbuseIPDBBlacklistResponse['meta']; rateLimit: RateLimitInfo | null }> {
   // Validate confidenceMinimum according to AbuseIPDB requirements (25-100)
+  // Accepts decimal values for fine-grained filtering
   if (!Number.isFinite(confidenceMinimum) || confidenceMinimum < 25 || confidenceMinimum > 100) {
     throw new RangeError('confidenceMinimum must be between 25 and 100.');
   }
