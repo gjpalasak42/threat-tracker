@@ -39,7 +39,7 @@ export async function GET() {
           database: 'disconnected',
           application: 'running',
         },
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: 'Service unavailable',
       },
       { status: 503 }
     );
