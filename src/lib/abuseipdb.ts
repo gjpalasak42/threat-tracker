@@ -119,7 +119,7 @@ export async function checkIp(
   if (!response.ok) {
     const errorData = await response.json() as AbuseIPDBError;
     const errorMessage = errorData.errors?.[0]?.detail || 'Unknown error';
-    throw new Error(`AbuseIPDB API error: ${errorMessage}`);
+    throw new Error(`AbuseIPDB API error (${response.status}): ${errorMessage}`);
   }
 
   const result = await response.json() as AbuseIPDBCheckResponse;
