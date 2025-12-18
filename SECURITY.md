@@ -8,6 +8,21 @@ We take security seriously. This section outlines which versions of Threat Track
 | ------- | ------------------ |
 | 0.1.x   | :white_check_mark: |
 
+## Known Issues
+
+### Development Dependencies
+
+The project currently has 4 moderate severity npm audit warnings related to `drizzle-kit` development dependency chain (esbuild vulnerability GHSA-67mh-4wv8-2f99). 
+
+**Status**: Acknowledged, low risk
+- **Scope**: Development-only dependency, not included in production builds
+- **Issue**: Old version of esbuild in drizzle-kit's dependency chain
+- **Mitigation**: Using latest stable drizzle-kit version (0.31.8)
+- **Impact**: Minimal - only affects local development, not production deployments
+- **Resolution**: Waiting for upstream fix in drizzle-kit
+
+This vulnerability does not affect production deployments since drizzle-kit is only used during development for database schema management.
+
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability within Threat Tracker, please send an email to the repository owner. All security vulnerabilities will be promptly addressed.
