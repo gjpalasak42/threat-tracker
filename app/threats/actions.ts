@@ -208,7 +208,7 @@ export async function getThreats(
       .from(threatLogs),
   ]);
 
-  const total = totalResult[0]?.count ?? 0;
+  const total = Number(totalResult[0]?.count ?? 0);
 
   return {
     threats,
