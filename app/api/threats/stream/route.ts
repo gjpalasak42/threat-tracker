@@ -21,6 +21,16 @@ export async function GET(request: Request) {
 
   // Create a dedicated connection for this SSE client
   // This connection will be used exclusively for LISTEN
+  // 
+  // IMPORTANT: Each SSE client creates a dedicated database connection that persists
+  // for the duration of the connection. This can lead to connection pool exhaustion
+  // under high load. The default Postgres connection limit is typically 100-200.
+  // 
+  // For production deployments:
+  // - Monitor active SSE connections and database connection pool usage
+  // - Set appropriate max_connections in PostgreSQL configuration
+  // - Consider implementing a connection limit or load balancing strategy
+  // - Document the expected maximum number of concurrent SSE clients
   const listener = postgres(connectionString, {
     max: 1,
     idle_timeout: 0, // Keep connection alive
@@ -48,7 +58,21 @@ export async function GET(request: Request) {
 
           try {
             const threatData = JSON.parse(payload);
-            const sseMessage = `event: threat\ndata: ${JSON.stringify(threatData)}\n\n`;
+            
+            // Sanitize threat data before streaming to clients
+            // Remove potentially sensitive fields from metadata
+            const sanitized = {
+              ...threatData,
+              metadata: threatData.metadata ? {
+                // Only include non-sensitive metadata fields
+                lastReportedAt: threatData.metadata.lastReportedAt,
+                importedAt: threatData.metadata.importedAt,
+                countryCode: threatData.metadata.countryCode,
+                // Exclude other potentially sensitive fields like ISP, domain, etc.
+              } : undefined,
+            };
+            
+            const sseMessage = `event: threat\ndata: ${JSON.stringify(sanitized)}\n\n`;
             controller.enqueue(encoder.encode(sseMessage));
           } catch (parseError) {
             console.error('Failed to parse threat notification:', parseError);
@@ -57,9 +81,11 @@ export async function GET(request: Request) {
 
         // Send heartbeat every 30 seconds to keep connection alive
         heartbeatInterval = setInterval(() => {
+          // Check connection status before attempting to send
           if (!isConnected) {
             if (heartbeatInterval) {
               clearInterval(heartbeatInterval);
+              heartbeatInterval = null;
             }
             return;
           }
@@ -68,10 +94,12 @@ export async function GET(request: Request) {
             controller.enqueue(
               encoder.encode(`event: heartbeat\ndata: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`)
             );
-          } catch {
-            // Connection closed, clean up
+          } catch (error) {
+            // Connection closed during send, clean up
+            isConnected = false;
             if (heartbeatInterval) {
               clearInterval(heartbeatInterval);
+              heartbeatInterval = null;
             }
           }
         }, 30000);
@@ -96,6 +124,12 @@ export async function GET(request: Request) {
         console.error('Failed to set up threat listener:', error);
         isConnected = false;
         
+        // Clean up heartbeat interval if it was created
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+          heartbeatInterval = null;
+        }
+        
         // Send error event to client before closing
         try {
           const errorEvent = {
@@ -110,10 +144,12 @@ export async function GET(request: Request) {
           // If sending the error event fails, proceed to error the controller
         }
         
+        // Clean up database connection
         try {
           await listener.end();
-        } catch {
-          // Ignore cleanup errors
+        } catch (cleanupError) {
+          // Log cleanup errors but don't throw
+          console.error('Error during listener cleanup:', cleanupError);
         }
         
         controller.error(error);
@@ -124,6 +160,7 @@ export async function GET(request: Request) {
       isConnected = false;
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
       }
       listener.end().catch(console.error);
     },
