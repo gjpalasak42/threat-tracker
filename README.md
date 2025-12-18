@@ -1,8 +1,10 @@
 # Threat Tracker
 
+> ⚠️ **Project Status**: This project is currently in active development. Features listed below are planned and may not be fully implemented yet.
+
 A modern threat intelligence tracking application built with Next.js, TypeScript, and PostgreSQL. Track and manage cybersecurity threat indicators with confidence scoring and multi-source support.
 
-## Features
+## Planned Features
 
 - 🔒 **Threat Intelligence Tracking**: Store and manage threat indicators (IPs, domains, URLs, hashes)
 - 📊 **Severity Scoring**: 1-100 scale severity ratings for threat assessment
@@ -24,7 +26,7 @@ A modern threat intelligence tracking application built with Next.js, TypeScript
 
 ### Prerequisites
 
-- Node.js 20+ or Bun 1.0+
+- Bun 1.0+ (recommended) or Node.js 20+
 - Docker and Docker Compose (for containerized deployment)
 - PostgreSQL 16 (if running locally without Docker)
 
@@ -38,8 +40,6 @@ cd threat-tracker
 
 2. Install dependencies:
 ```bash
-npm install
-# or
 bun install
 ```
 
@@ -53,12 +53,12 @@ cp .env.example .env
 
 **Option A: Local Development**
 ```bash
-npm run dev
+bun run dev
 ```
 
 **Option B: Docker Development**
 ```bash
-npm run dev:docker
+bun run dev:docker
 ```
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -69,22 +69,22 @@ The application uses Drizzle ORM for database management.
 
 **Generate migrations:**
 ```bash
-npm run db:generate
+bun run db:generate
 ```
 
 **Run migrations:**
 ```bash
-npm run db:migrate
+bun run db:migrate
 ```
 
 **Push schema changes (development):**
 ```bash
-npm run db:push
+bun run db:push
 ```
 
 **Open Drizzle Studio:**
 ```bash
-npm run db:studio
+bun run db:studio
 ```
 
 ## Project Structure
@@ -129,12 +129,12 @@ Stores threat intelligence indicators with the following fields:
 
 ### Development Mode
 ```bash
-npm run dev:docker
+bun run dev:docker
 ```
 
 ### Production Mode
 ```bash
-npm run prod:docker
+bun run prod:docker
 ```
 
 The Docker setup includes:
@@ -165,17 +165,17 @@ BUILD_TARGET=development
 
 ### Running Linter
 ```bash
-npm run lint
+bun run lint
 ```
 
 ### Building for Production
 ```bash
-npm run build
+bun run build
 ```
 
 ### Starting Production Server
 ```bash
-npm run start
+bun run start
 ```
 
 ## Contributing

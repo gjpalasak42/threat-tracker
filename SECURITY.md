@@ -12,7 +12,7 @@ We take security seriously. This section outlines which versions of Threat Track
 
 ### Development Dependencies
 
-The project currently has 4 moderate severity npm audit warnings related to `drizzle-kit` development dependency chain (esbuild vulnerability GHSA-67mh-4wv8-2f99). 
+The project currently has 4 moderate severity audit warnings related to `drizzle-kit` development dependency chain (esbuild vulnerability GHSA-67mh-4wv8-2f99). 
 
 **Status**: Acknowledged, low risk
 - **Scope**: Development-only dependency, not included in production builds
@@ -51,7 +51,7 @@ When deploying Threat Tracker:
 1. **Never use default credentials** - Always change default passwords in `.env.example`
 2. **Use strong passwords** - Generate random, complex passwords for production
 3. **Enable HTTPS** - Always use TLS/SSL in production environments
-4. **Keep dependencies updated** - Regularly run `npm audit` and update packages
+4. **Keep dependencies updated** - Regularly run `bun audit` and update packages
 5. **Restrict database access** - Don't expose PostgreSQL port (5432) publicly
 6. **Use environment variables** - Never commit secrets to version control
 7. **Regular backups** - Implement regular database backup procedures

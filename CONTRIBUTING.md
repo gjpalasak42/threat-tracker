@@ -47,13 +47,13 @@ git clone https://github.com/your-username/threat-tracker.git
 cd threat-tracker
 
 # Install dependencies
-npm install
+bun install
 
 # Copy environment file
 cp .env.example .env
 
 # Start development server
-npm run dev
+bun run dev
 ```
 
 ### Coding Standards
