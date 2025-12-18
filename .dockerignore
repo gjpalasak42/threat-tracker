@@ -35,9 +35,8 @@ coverage
 .idea
 
 # Documentation
-README.md
-*.md
 !README.md
+*.md
 
 # Docker
 Dockerfile
