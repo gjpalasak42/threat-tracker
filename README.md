@@ -1,36 +1,194 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Threat Tracker
+
+A modern threat intelligence tracking application built with Next.js, TypeScript, and PostgreSQL. Track and manage cybersecurity threat indicators with confidence scoring and multi-source support.
+
+## Features
+
+- 🔒 **Threat Intelligence Tracking**: Store and manage threat indicators (IPs, domains, URLs, hashes)
+- 📊 **Severity Scoring**: 1-100 scale severity ratings for threat assessment
+- 🎯 **Confidence Scoring**: Multi-source deconfliction with confidence metrics
+- 🗄️ **PostgreSQL Database**: Robust data persistence with Drizzle ORM
+- 🐳 **Docker Support**: Easy deployment with Docker Compose
+- ⚡ **Modern Stack**: Built with Next.js 16, React 19, and TypeScript
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript 5
+- **Database**: PostgreSQL 16
+- **ORM**: Drizzle ORM
+- **UI**: React 19, Tailwind CSS 4, shadcn/ui components
+- **Runtime**: Node.js (Bun-compatible)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
+- Node.js 20+ or Bun 1.0+
+- Docker and Docker Compose (for containerized deployment)
+- PostgreSQL 16 (if running locally without Docker)
+
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/gjpalasak42/threat-tracker.git
+cd threat-tracker
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+# or
+bun install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Start the development server:
+
+**Option A: Local Development**
+```bash
+npm run dev
+```
+
+**Option B: Docker Development**
+```bash
+npm run dev:docker
+```
+
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Database Setup
+
+The application uses Drizzle ORM for database management.
+
+**Generate migrations:**
+```bash
+npm run db:generate
+```
+
+**Run migrations:**
+```bash
+npm run db:migrate
+```
+
+**Push schema changes (development):**
+```bash
+npm run db:push
+```
+
+**Open Drizzle Studio:**
+```bash
+npm run db:studio
+```
+
+## Project Structure
+
+```
+threat-tracker/
+├── app/                    # Next.js app directory
+│   ├── layout.tsx         # Root layout
+│   ├── page.tsx           # Home page
+│   └── globals.css        # Global styles
+├── components/            # React components
+│   ├── ui/               # Reusable UI components
+│   └── component-example.tsx
+├── src/
+│   └── db/               # Database configuration
+│       ├── db.ts         # Database connection
+│       ├── schema.ts     # Drizzle schema definitions
+│       └── index.ts      # Database exports
+├── lib/                  # Utility functions
+├── public/               # Static assets
+├── docker-compose.yml    # Docker orchestration
+├── Dockerfile            # Container configuration
+└── drizzle.config.ts     # Drizzle ORM configuration
+```
+
+## Database Schema
+
+### Threat Logs Table
+
+Stores threat intelligence indicators with the following fields:
+
+- `id`: UUID primary key
+- `indicator`: The threat indicator (IP, domain, URL, hash, etc.)
+- `type`: Indicator type ('ipv4', 'ipv6', 'domain', 'url', 'hash')
+- `severity`: Integer (1-100) indicating threat severity
+- `confidenceScore`: Real number for multi-source deconfliction
+- `source`: Data source (e.g., 'AbuseIPDB', 'VirusTotal')
+- `metadata`: JSONB field for flexible additional data
+- `createdAt`: Timestamp with timezone
+
+## Docker Deployment
+
+### Development Mode
+```bash
+npm run dev:docker
+```
+
+### Production Mode
+```bash
+npm run prod:docker
+```
+
+The Docker setup includes:
+- PostgreSQL 16 Alpine container with health checks
+- Next.js application container
+- Persistent volume for database data
+- Automatic service dependency management
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and configure:
+
+```env
+# Database Configuration
+POSTGRES_USER=threat_user
+POSTGRES_PASSWORD=threat_pass
+POSTGRES_DB=threat_tracker
+
+# Application
+DATABASE_URL=postgres://threat_user:threat_pass@localhost:5432/threat_tracker
+NODE_ENV=development
+
+# Docker Build Target (development | production)
+BUILD_TARGET=development
+```
+
+## Development
+
+### Running Linter
+```bash
+npm run lint
+```
+
+### Building for Production
+```bash
+npm run build
+```
+
+### Starting Production Server
+```bash
+npm run start
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Drizzle ORM Documentation](https://orm.drizzle.team/docs/overview)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [Docker Documentation](https://docs.docker.com/)
