@@ -1,13 +1,22 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/src/db/db';
 import { sql } from 'drizzle-orm';
+import { successResponse, errorResponse, ErrorCodes } from '@/src/lib/api-response';
+
+interface HealthData {
+  status: 'healthy' | 'unhealthy';
+  services: {
+    database: 'connected' | 'disconnected';
+    application: 'running';
+  };
+}
 
 /**
  * Health check endpoint for monitoring application and database status
  * 
  * GET /api/health
  * 
- * @returns JSON response with health status
+ * @returns JSON response with health status using standardized format
  * - 200: Application and database are healthy
  * - 503: Service unavailable (database connection failed)
  */
@@ -16,32 +25,35 @@ export async function GET() {
     // Check database connectivity with a simple query
     await db.execute(sql`SELECT 1`);
     
-    return NextResponse.json(
+    const response = successResponse<HealthData>(
       {
         status: 'healthy',
-        timestamp: new Date().toISOString(),
         services: {
           database: 'connected',
           application: 'running',
         },
       },
-      { status: 200 }
+      'internal'
     );
+
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     // Log error for debugging (in production, use proper logging)
     console.error('Health check failed:', error);
     
-    return NextResponse.json(
+    const response = errorResponse(
+      ErrorCodes.CONNECTION_ERROR,
+      'Database connection failed',
+      'internal',
       {
         status: 'unhealthy',
-        timestamp: new Date().toISOString(),
         services: {
           database: 'disconnected',
           application: 'running',
         },
-        error: 'Service unavailable',
-      },
-      { status: 503 }
+      }
     );
+
+    return NextResponse.json(response, { status: 503 });
   }
 }

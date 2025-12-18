@@ -1,5 +1,5 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import postgres, { type Sql } from 'postgres';
 import * as schema from './schema';
 
 /**
@@ -28,29 +28,63 @@ function getDatabaseUrl(): string {
   return connectionString;
 }
 
-// Get validated database URL
-const connectionString = getDatabaseUrl();
+// Singleton instances for lazy initialization
+let clientInstance: Sql | null = null;
+let dbInstance: PostgresJsDatabase<typeof schema> | null = null;
 
 /**
- * PostgreSQL client with connection pooling
+ * Get or create the PostgreSQL client with connection pooling
  * Configuration optimized for production use
+ * @returns {Sql} PostgreSQL client instance
  */
-const client = postgres(connectionString, {
-  max: 10, // Maximum number of connections in the pool
-  idle_timeout: 20, // Close idle connections after 20 seconds
-  connect_timeout: 10, // Connection timeout in seconds
-  // Prevent connection leaks in serverless environments
-  max_lifetime: 60 * 30, // 30 minutes
-});
+export function getClient(): Sql {
+  if (!clientInstance) {
+    const connectionString = getDatabaseUrl();
+    clientInstance = postgres(connectionString, {
+      max: 10, // Maximum number of connections in the pool
+      idle_timeout: 20, // Close idle connections after 20 seconds
+      connect_timeout: 10, // Connection timeout in seconds
+      // Prevent connection leaks in serverless environments
+      max_lifetime: 60 * 30, // 30 minutes
+    });
+  }
+  return clientInstance;
+}
+
+/**
+ * Get or create the Drizzle ORM database instance with schema
+ * Uses lazy initialization to support Next.js static builds
+ * @returns {PostgresJsDatabase<typeof schema>} Drizzle ORM instance
+ */
+export function getDb(): PostgresJsDatabase<typeof schema> {
+  if (!dbInstance) {
+    dbInstance = drizzle(getClient(), { schema });
+  }
+  return dbInstance;
+}
 
 /**
  * Drizzle ORM database instance with schema
  * Use this instance for all database operations
+ * 
+ * Note: This uses a Proxy for backwards compatibility with existing code.
+ * For new code, prefer using getDb() directly.
  */
-export const db = drizzle(client, { schema });
+export const db: PostgresJsDatabase<typeof schema> = new Proxy({} as PostgresJsDatabase<typeof schema>, {
+  get(_target, prop) {
+    return (getDb() as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
 
 /**
  * Raw PostgreSQL client for advanced use cases
  * Use sparingly - prefer the `db` instance for type-safe queries
+ * 
+ * Note: This uses a Proxy for backwards compatibility with existing code.
+ * For new code, prefer using getClient() directly.
  */
-export { client };
+export const client: Sql = new Proxy({} as Sql, {
+  get(_target, prop) {
+    return (getClient() as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
