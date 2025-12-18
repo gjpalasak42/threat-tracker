@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, real, jsonb, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, real, jsonb, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 /**
  * Threat logs table for storing threat intelligence indicators
@@ -12,7 +12,10 @@ export const threatLogs = pgTable('threat_logs', {
   source: text('source').notNull(), // e.g., 'AbuseIPDB', 'VirusTotal'
   metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}), // Flexible extra data
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  // Unique constraint for deduplication: same indicator from same source
+  uniqueIndex('threat_logs_indicator_source_idx').on(table.indicator, table.source),
+]);
 
 // Type exports for use in application
 export type ThreatLog = typeof threatLogs.$inferSelect;

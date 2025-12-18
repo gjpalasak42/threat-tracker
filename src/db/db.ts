@@ -1,5 +1,5 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import postgres, { type Sql } from 'postgres';
 import * as schema from './schema';
 
 /**
@@ -28,29 +28,49 @@ function getDatabaseUrl(): string {
   return connectionString;
 }
 
-// Get validated database URL
-const connectionString = getDatabaseUrl();
+// Singleton instances for lazy initialization
+let clientInstance: Sql | null = null;
+let dbInstance: PostgresJsDatabase<typeof schema> | null = null;
 
 /**
- * PostgreSQL client with connection pooling
+ * Get or create the PostgreSQL client with connection pooling
  * Configuration optimized for production use
  */
-const client = postgres(connectionString, {
-  max: 10, // Maximum number of connections in the pool
-  idle_timeout: 20, // Close idle connections after 20 seconds
-  connect_timeout: 10, // Connection timeout in seconds
-  // Prevent connection leaks in serverless environments
-  max_lifetime: 60 * 30, // 30 minutes
-});
+function getClient(): Sql {
+  if (!clientInstance) {
+    const connectionString = getDatabaseUrl();
+    clientInstance = postgres(connectionString, {
+      max: 10, // Maximum number of connections in the pool
+      idle_timeout: 20, // Close idle connections after 20 seconds
+      connect_timeout: 10, // Connection timeout in seconds
+      // Prevent connection leaks in serverless environments
+      max_lifetime: 60 * 30, // 30 minutes
+    });
+  }
+  return clientInstance;
+}
 
 /**
  * Drizzle ORM database instance with schema
  * Use this instance for all database operations
+ * 
+ * Uses lazy initialization to support Next.js static builds
  */
-export const db = drizzle(client, { schema });
+export const db: PostgresJsDatabase<typeof schema> = new Proxy({} as PostgresJsDatabase<typeof schema>, {
+  get(_target, prop) {
+    if (!dbInstance) {
+      dbInstance = drizzle(getClient(), { schema });
+    }
+    return (dbInstance as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
 
 /**
  * Raw PostgreSQL client for advanced use cases
  * Use sparingly - prefer the `db` instance for type-safe queries
  */
-export { client };
+export const client: Sql = new Proxy({} as Sql, {
+  get(_target, prop) {
+    return (getClient() as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
