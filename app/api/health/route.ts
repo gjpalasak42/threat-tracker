@@ -44,7 +44,14 @@ export async function GET() {
     const response = errorResponse(
       ErrorCodes.CONNECTION_ERROR,
       'Database connection failed',
-      'internal'
+      'internal',
+      {
+        status: 'unhealthy',
+        services: {
+          database: 'disconnected',
+          application: 'running',
+        },
+      }
     );
 
     return NextResponse.json(response, { status: 503 });
