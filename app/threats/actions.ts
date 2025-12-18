@@ -31,8 +31,14 @@ export interface IngestionResult {
 
 /**
  * Detect IP version from address string
+ * Handles IPv4-mapped IPv6 addresses (e.g., "::ffff:192.0.2.1") as IPv4
  */
 function detectIpVersion(ip: string): 'ipv4' | 'ipv6' {
+  // Check for IPv4-mapped IPv6 addresses
+  if (ip.toLowerCase().startsWith('::ffff:')) {
+    return 'ipv4';
+  }
+  // Standard check: if it contains ':', it's IPv6; otherwise, IPv4
   return ip.includes(':') ? 'ipv6' : 'ipv4';
 }
 
@@ -84,7 +90,7 @@ export async function ingestFromAbuseIPDB(
     }));
 
     // Batch insert with conflict resolution for deduplication
-    // This uses a raw SQL approach for ON CONFLICT handling
+    // This uses Drizzle's query builder to express ON CONFLICT DO NOTHING for deduplication
     const result = await db.insert(threatLogs)
       .values(records)
       .onConflictDoNothing()
@@ -194,16 +200,16 @@ export async function getThreats(
   offset: number = 0
 ): Promise<GetThreatsResult> {
   // Enforce limits
-  limit = Math.max(1, Math.min(limit, 100));
-  offset = Math.max(0, offset);
+  const enforcedLimit = Math.max(1, Math.min(limit, 100));
+  const enforcedOffset = Math.max(0, offset);
 
   // Fetch threats with pagination
   const [threats, totalResult] = await Promise.all([
     db.select()
       .from(threatLogs)
       .orderBy(desc(threatLogs.createdAt))
-      .limit(limit)
-      .offset(offset),
+      .limit(enforcedLimit)
+      .offset(enforcedOffset),
     db.select({ count: count() })
       .from(threatLogs),
   ]);
@@ -213,10 +219,10 @@ export async function getThreats(
   return {
     threats,
     pagination: {
-      limit,
-      offset,
+      limit: enforcedLimit,
+      offset: enforcedOffset,
       total,
-      hasMore: offset + threats.length < total,
+      hasMore: enforcedOffset + threats.length < total,
     },
   };
 }
