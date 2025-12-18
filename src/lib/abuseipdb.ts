@@ -108,11 +108,9 @@ export async function checkIp(
     throw new Error('Invalid IP address: IP address must be a non-empty string');
   }
   
-  // Basic IP address format validation
-  const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-  const ipv6Pattern = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
-  
-  if (!ipv4Pattern.test(ipAddress) && !ipv6Pattern.test(ipAddress)) {
+  // Use Node.js net module for robust IP validation
+  const { isIP } = await import('net');
+  if (isIP(ipAddress) === 0) {
     throw new Error(`Invalid IP address format: ${ipAddress}`);
   }
   
@@ -165,7 +163,7 @@ export async function getBlacklist(
   limit?: number
 ): Promise<{ data: AbuseIPDBBlacklistResponse['data']; meta: AbuseIPDBBlacklistResponse['meta']; rateLimit: RateLimitInfo | null }> {
   // Validate confidenceMinimum according to AbuseIPDB requirements (25-100)
-  if (confidenceMinimum < 25 || confidenceMinimum > 100) {
+  if (!Number.isFinite(confidenceMinimum) || confidenceMinimum < 25 || confidenceMinimum > 100) {
     throw new RangeError('confidenceMinimum must be between 25 and 100.');
   }
   
