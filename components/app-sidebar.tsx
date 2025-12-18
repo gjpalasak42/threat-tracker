@@ -59,14 +59,15 @@ export function AppSidebar() {
                 const isActive = pathname === item.href;
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      tooltip={item.title}
-                      render={<Link href={item.href} />}
-                    >
-                      <item.icon className={isActive ? 'text-emerald-500' : ''} />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
+                    <Link href={item.href} className="w-full">
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        tooltip={item.title}
+                      >
+                        <item.icon className={isActive ? 'text-emerald-500' : ''} />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </Link>
                   </SidebarMenuItem>
                 );
               })}
@@ -78,3 +79,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+

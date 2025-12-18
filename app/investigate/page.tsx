@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { investigateIp, type InvestigateResult } from './actions';
-import { Search, Globe, Shield, AlertTriangle, Clock, Loader2 } from 'lucide-react';
+import { Search, Globe, Shield, AlertTriangle, Clock, Loader2, RefreshCw, Database } from 'lucide-react';
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'Never';
@@ -24,12 +24,21 @@ export default function InvestigatePage() {
   const [result, setResult] = useState<InvestigateResult | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent, forceRefresh: boolean = false) => {
     e.preventDefault();
     if (!ipAddress.trim()) return;
 
     startTransition(async () => {
-      const res = await investigateIp(ipAddress);
+      const res = await investigateIp(ipAddress, forceRefresh);
+      setResult(res);
+    });
+  };
+
+  const handleForceRefresh = () => {
+    if (!result?.data?.ipAddress) return;
+    
+    startTransition(async () => {
+      const res = await investigateIp(result.data!.ipAddress, true);
       setResult(res);
     });
   };
@@ -39,7 +48,7 @@ export default function InvestigatePage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Investigate IP</h1>
         <p className="text-sm text-muted-foreground">
-          Manually check an IP address against AbuseIPDB
+          Manually check an IP address against AbuseIPDB (cached results shown when available)
         </p>
       </div>
 
@@ -55,7 +64,7 @@ export default function InvestigatePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="flex gap-2">
+          <form onSubmit={(e) => handleSubmit(e, false)} className="flex gap-2">
             <Input
               type="text"
               placeholder="e.g., 8.8.8.8"
@@ -98,16 +107,49 @@ export default function InvestigatePage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="font-mono">{result.data.ipAddress}</CardTitle>
-              <Badge 
-                variant={result.data.abuseConfidenceScore > 75 ? 'destructive' : result.data.abuseConfidenceScore > 25 ? 'default' : 'secondary'}
-                className="text-sm"
-              >
-                {result.data.abuseConfidenceScore > 75 ? 'Confirmed Threat' : result.data.abuseConfidenceScore > 25 ? 'Suspicious' : 'Clean'}
-              </Badge>
+              <div className="flex items-center gap-3">
+                <CardTitle className="font-mono">{result.data.ipAddress}</CardTitle>
+                {/* Cache Indicator */}
+                {result.fromCache ? (
+                  <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30">
+                    <Database className="mr-1 h-3 w-3" />
+                    Cached
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500">
+                    Live
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Force Refresh Button */}
+                {result.fromCache && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleForceRefresh}
+                    disabled={isPending}
+                  >
+                    {isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    Refresh from API
+                  </Button>
+                )}
+                <Badge 
+                  variant={result.data.abuseConfidenceScore > 75 ? 'destructive' : result.data.abuseConfidenceScore > 25 ? 'default' : 'secondary'}
+                  className="text-sm"
+                >
+                  {result.data.abuseConfidenceScore > 75 ? 'Confirmed Threat' : result.data.abuseConfidenceScore > 25 ? 'Suspicious' : 'Clean'}
+                </Badge>
+              </div>
             </div>
             <CardDescription>
-              Analysis from AbuseIPDB
+              {result.fromCache 
+                ? `Cached data from ${formatDate(result.cachedAt ?? null)}`
+                : 'Live analysis from AbuseIPDB'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -186,8 +228,8 @@ export default function InvestigatePage() {
               )}
             </div>
 
-            {/* Rate Limit Info */}
-            {result.rateLimit && (
+            {/* Rate Limit Info (only shown for live requests) */}
+            {!result.fromCache && result.rateLimit && (
               <div className="text-xs text-muted-foreground">
                 API Rate Limit: {result.rateLimit.remaining} / {result.rateLimit.limit} requests remaining
               </div>
