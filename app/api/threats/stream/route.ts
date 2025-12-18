@@ -160,6 +160,7 @@ export async function GET(request: Request) {
       isConnected = false;
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
       }
       listener.end().catch(console.error);
     },

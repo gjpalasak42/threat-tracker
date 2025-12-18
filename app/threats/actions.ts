@@ -11,6 +11,7 @@ import { threatLogs, type NewThreatLog, type ThreatLog } from '@/src/db/schema';
 import { getBlacklist, checkIp } from '@/src/lib/abuseipdb';
 import { desc, count } from 'drizzle-orm';
 import { isIP } from 'net';
+import { timingSafeEqual } from 'crypto';
 
 const THREAT_SOURCE_ABUSEIPDB = 'AbuseIPDB';
 
@@ -19,6 +20,27 @@ const THREAT_SOURCE_ABUSEIPDB = 'AbuseIPDB';
  * Used to detect IPv4 addresses in IPv6 format (e.g., ::ffff:192.0.2.1)
  */
 const IPV4_MAPPED_IPV6_PREFIX = '::ffff:';
+
+/**
+ * Performs timing-safe comparison of two strings to prevent timing attacks
+ * @param a - First string to compare
+ * @param b - Second string to compare
+ * @returns true if strings are equal, false otherwise
+ */
+function timingSafeCompare(a: string, b: string): boolean {
+  // Convert strings to buffers for timing-safe comparison
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  
+  // If lengths don't match, use dummy comparison to maintain constant time
+  if (bufA.length !== bufB.length) {
+    // Still perform a comparison to maintain timing consistency
+    timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  
+  return timingSafeEqual(bufA, bufB);
+}
 
 /**
  * Ingestion result for tracking what was processed
@@ -81,15 +103,17 @@ export async function ingestFromAbuseIPDB(
 ): Promise<IngestionResult> {
   // Check for authentication token if configured
   const expectedToken = process.env.THREAT_INGESTION_SECRET;
-  if (expectedToken && authToken !== expectedToken) {
-    return {
-      success: false,
-      source: THREAT_SOURCE_ABUSEIPDB,
-      processed: 0,
-      inserted: 0,
-      duplicates: 0,
-      errors: ['Unauthorized: Invalid or missing authentication token'],
-    };
+  if (expectedToken) {
+    if (!authToken || !timingSafeCompare(authToken, expectedToken)) {
+      return {
+        success: false,
+        source: THREAT_SOURCE_ABUSEIPDB,
+        processed: 0,
+        inserted: 0,
+        duplicates: 0,
+        errors: ['Unauthorized: Invalid or missing authentication token'],
+      };
+    }
   }
   
   const errors: string[] = [];
@@ -192,12 +216,13 @@ export async function checkAndIngestIp(
   ipData: Awaited<ReturnType<typeof checkIp>>['data'];
   ingested: boolean;
   rateLimit?: { remaining: number; limit: number };
-  error?: string;
 }> {
   // Check for authentication token if auto-ingestion is enabled and token is configured
   const expectedToken = process.env.THREAT_INGESTION_SECRET;
-  if (autoIngest && expectedToken && authToken !== expectedToken) {
-    throw new Error('Unauthorized: Invalid or missing authentication token for threat ingestion');
+  if (autoIngest && expectedToken) {
+    if (!authToken || !timingSafeCompare(authToken, expectedToken)) {
+      throw new Error('Unauthorized: Invalid or missing authentication token for threat ingestion');
+    }
   }
   
   const { data, rateLimit } = await checkIp(ipAddress);
