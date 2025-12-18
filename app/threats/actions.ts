@@ -194,9 +194,8 @@ export async function getThreats(
   offset: number = 0
 ): Promise<GetThreatsResult> {
   // Enforce limits
-  if (limit < 1) limit = 50;
-  if (limit > 100) limit = 100;
-  if (offset < 0) offset = 0;
+  limit = Math.max(1, Math.min(limit, 100));
+  offset = Math.max(0, offset);
 
   // Fetch threats with pagination
   const [threats, totalResult] = await Promise.all([
