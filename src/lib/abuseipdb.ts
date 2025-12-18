@@ -5,6 +5,8 @@
  * @see https://docs.abuseipdb.com/
  */
 
+import { isIP } from 'net';
+
 const ABUSEIPDB_BASE_URL = 'https://api.abuseipdb.com/api/v2';
 
 /**
@@ -95,12 +97,36 @@ function parseRateLimitHeaders(headers: Headers): RateLimitInfo | null {
  * @param ipAddress - The IP address to check
  * @param maxAgeInDays - How far back to check (1-365, default 90)
  * @returns IP abuse data with rate limit info
+ * @throws {Error} If ipAddress is invalid or maxAgeInDays is out of range
  */
 export async function checkIp(
   ipAddress: string,
   maxAgeInDays: number = 90
 ): Promise<{ data: AbuseIPDBCheckResponse['data']; rateLimit: RateLimitInfo | null }> {
   const apiKey = getApiKey();
+  
+  // Validate IP address format
+  if (!ipAddress || typeof ipAddress !== 'string' || ipAddress.trim().length === 0) {
+    throw new Error('Invalid IP address: IP address must be a non-empty string');
+  }
+  
+  // Use Node.js net module for robust IP validation
+  if (isIP(ipAddress) === 0) {
+    throw new Error(`Invalid IP address format: ${ipAddress}`);
+  }
+  
+  // Validate maxAgeInDays according to AbuseIPDB requirements (1-365)
+  // Must be an integer since days are discrete units
+  if (
+    !Number.isFinite(maxAgeInDays) ||
+    !Number.isInteger(maxAgeInDays) ||
+    maxAgeInDays < 1 ||
+    maxAgeInDays > 365
+  ) {
+    throw new RangeError(
+      `Invalid maxAgeInDays value: ${maxAgeInDays}. Expected a finite integer between 1 and 365.`
+    );
+  }
   
   const url = new URL(`${ABUSEIPDB_BASE_URL}/check`);
   url.searchParams.set('ipAddress', ipAddress);
@@ -132,11 +158,18 @@ export async function checkIp(
  * @param confidenceMinimum - Minimum abuse confidence score (25-100, default 90)
  * @param limit - Maximum number of results (optional, depends on subscription)
  * @returns Array of blacklisted IPs with rate limit info
+ * @throws {RangeError} If confidenceMinimum is out of range
  */
 export async function getBlacklist(
   confidenceMinimum: number = 90,
   limit?: number
 ): Promise<{ data: AbuseIPDBBlacklistResponse['data']; meta: AbuseIPDBBlacklistResponse['meta']; rateLimit: RateLimitInfo | null }> {
+  // Validate confidenceMinimum according to AbuseIPDB requirements (25-100)
+  // Accepts decimal values for fine-grained filtering
+  if (!Number.isFinite(confidenceMinimum) || confidenceMinimum < 25 || confidenceMinimum > 100) {
+    throw new RangeError('confidenceMinimum must be between 25 and 100.');
+  }
+  
   const apiKey = getApiKey();
   
   const url = new URL(`${ABUSEIPDB_BASE_URL}/blacklist`);

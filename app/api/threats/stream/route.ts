@@ -29,6 +29,7 @@ export async function GET(request: Request) {
 
   // Track if the connection is still active
   let isConnected = true;
+  let heartbeatInterval: NodeJS.Timeout | null = null;
 
   // Create a ReadableStream for SSE
   const stream = new ReadableStream({
@@ -55,9 +56,11 @@ export async function GET(request: Request) {
         });
 
         // Send heartbeat every 30 seconds to keep connection alive
-        const heartbeatInterval = setInterval(() => {
+        heartbeatInterval = setInterval(() => {
           if (!isConnected) {
-            clearInterval(heartbeatInterval);
+            if (heartbeatInterval) {
+              clearInterval(heartbeatInterval);
+            }
             return;
           }
           
@@ -67,14 +70,18 @@ export async function GET(request: Request) {
             );
           } catch {
             // Connection closed, clean up
-            clearInterval(heartbeatInterval);
+            if (heartbeatInterval) {
+              clearInterval(heartbeatInterval);
+            }
           }
         }, 30000);
 
         // Handle client disconnect
         request.signal.addEventListener('abort', async () => {
           isConnected = false;
-          clearInterval(heartbeatInterval);
+          if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+          }
           
           try {
             await listener.end();
@@ -89,6 +96,20 @@ export async function GET(request: Request) {
         console.error('Failed to set up threat listener:', error);
         isConnected = false;
         
+        // Send error event to client before closing
+        try {
+          const errorEvent = {
+            message: 'Failed to set up threat listener',
+            error: error instanceof Error ? error.message : String(error),
+            timestamp: new Date().toISOString(),
+          };
+          controller.enqueue(
+            encoder.encode(`event: error\ndata: ${JSON.stringify(errorEvent)}\n\n`)
+          );
+        } catch {
+          // If sending the error event fails, proceed to error the controller
+        }
+        
         try {
           await listener.end();
         } catch {
@@ -101,6 +122,9 @@ export async function GET(request: Request) {
 
     cancel() {
       isConnected = false;
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
       listener.end().catch(console.error);
     },
   });
