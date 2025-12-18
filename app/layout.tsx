@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
 
 const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-sans'});
 
@@ -15,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Threat Tracker - Threat Intelligence Management",
-  description: "A modern threat intelligence tracking application for managing cybersecurity threat indicators with confidence scoring and multi-source support.",
+  title: "Threat Tracker - OSINT Investigation Hub",
+  description: "A security operations center for threat intelligence with real-time feeds, IP investigation, and automated ingestion.",
 };
 
 export default function RootLayout({
@@ -25,12 +27,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={jetbrainsMono.variable}>
+    <html lang="en" className={`${jetbrainsMono.variable} dark`}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+              <SidebarTrigger className="-ml-1" />
+              <div className="h-4 w-px bg-border" />
+              <span className="text-xs text-muted-foreground">Security Operations Center</span>
+            </header>
+            <main className="flex-1 overflow-auto p-4">
+              {children}
+            </main>
+          </SidebarInset>
+        </SidebarProvider>
       </body>
     </html>
   );
 }
+

@@ -101,6 +101,9 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.552 0.016 285.938);
+  /* Emerald for healthy/success states */
+  --emerald: oklch(0.765 0.177 163.223);
+  --emerald-foreground: oklch(0.21 0.006 285.885);
   --chart-1: oklch(0.87 0.12 207);
   --chart-2: oklch(0.80 0.13 212);
   --chart-3: oklch(0.71 0.13 215);

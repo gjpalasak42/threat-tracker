@@ -4,11 +4,14 @@
 
 A modern threat intelligence tracking application built with Next.js, TypeScript, and PostgreSQL. Track and manage cybersecurity threat indicators with confidence scoring and multi-source support.
 
-## Planned Features
+## Features
 
-- 🔒 **Threat Intelligence Tracking**: Store and manage threat indicators (IPs, domains, URLs, hashes)
+- 🔒 **OSINT Investigation Hub**: Complete security operations dashboard
+- 🔍 **IP Investigation**: Manual lookup against AbuseIPDB with detailed reports
+- 📡 **Intelligence Pulse**: Real-time threat feed with SSE streaming
 - 📊 **Severity Scoring**: 1-100 scale severity ratings for threat assessment
 - 🎯 **Confidence Scoring**: Multi-source deconfliction with confidence metrics
+- ⏰ **Automated Sync**: Background ingestion from AbuseIPDB blacklist (2x/day)
 - 🗄️ **PostgreSQL Database**: Robust data persistence with Drizzle ORM
 - 🐳 **Docker Support**: Easy deployment with Docker Compose
 - ⚡ **Modern Stack**: Built with Next.js 16, React 19, and TypeScript
@@ -29,6 +32,7 @@ A modern threat intelligence tracking application built with Next.js, TypeScript
 - Bun 1.0+ (recommended) or Node.js 20+
 - Docker and Docker Compose (for containerized deployment)
 - PostgreSQL 16 (if running locally without Docker)
+- AbuseIPDB API Key (free tier available at https://www.abuseipdb.com/)
 
 ### Installation
 
@@ -87,24 +91,73 @@ bun run db:push
 bun run db:studio
 ```
 
+**Apply the SSE trigger (required for real-time feed):**
+```bash
+# Connect to your database and run the SQL from drizzle/0001_threat_notify.sql
+psql $DATABASE_URL -f drizzle/0001_threat_notify.sql
+```
+
+## Automated Threat Sync (Cron Job)
+
+The application includes an automated threat sync feature that pulls data from the AbuseIPDB blacklist twice daily.
+
+### GitHub Actions Setup
+
+1. **Configure Repository Secrets** in your GitHub repository settings:
+
+   | Secret | Description |
+   |--------|-------------|
+   | `APP_URL` | Your deployed application URL (e.g., `https://your-app.vercel.app`) |
+   | `CRON_SECRET` | A secure random string for authenticating cron requests |
+
+2. **Generate a CRON_SECRET**:
+   ```bash
+   openssl rand -base64 32
+   ```
+
+3. **Add the same CRON_SECRET to your deployed app's environment variables**.
+
+4. **The workflow runs automatically** at 6:00 AM and 6:00 PM UTC.
+
+5. **Manual trigger**: You can also trigger the sync manually from the GitHub Actions tab using "workflow_dispatch".
+
+### Rate Limiting
+
+- The sync endpoint enforces a **12-hour minimum gap** between syncs
+- This respects AbuseIPDB's free tier limit of **5 bulk requests per day**
+- The GitHub Actions cron runs twice daily, well within limits
+
+### Manual Sync (Testing)
+
+```bash
+curl -X POST https://your-app.vercel.app/api/sync \
+  -H "Authorization: Bearer YOUR_CRON_SECRET" \
+  -H "Content-Type: application/json"
+```
+
 ## Project Structure
 
 ```
 threat-tracker/
 ├── app/                    # Next.js app directory
-│   ├── layout.tsx         # Root layout
-│   ├── page.tsx           # Home page
+│   ├── layout.tsx         # Root layout with sidebar
+│   ├── page.tsx           # Dashboard home page
+│   ├── investigate/       # IP investigation page
+│   ├── pulse/             # Real-time threat feed
+│   ├── api/sync/          # Cron sync endpoint
 │   └── globals.css        # Global styles
 ├── components/            # React components
-│   ├── ui/               # Reusable UI components
-│   └── component-example.tsx
+│   ├── ui/               # shadcn/ui components
+│   ├── app-sidebar.tsx   # Main navigation sidebar
+│   └── threat-table.tsx  # Threat data table
 ├── src/
-│   └── db/               # Database configuration
-│       ├── db.ts         # Database connection
-│       ├── schema.ts     # Drizzle schema definitions
-│       └── index.ts      # Database exports
-├── lib/                  # Utility functions
-├── public/               # Static assets
+│   ├── db/               # Database configuration
+│   │   ├── db.ts         # Database connection
+│   │   └── schema.ts     # Drizzle schema definitions
+│   └── lib/              # API clients
+│       └── abuseipdb.ts  # AbuseIPDB integration
+├── .github/workflows/    # GitHub Actions
+│   └── sync.yml          # Automated threat sync
 ├── docker-compose.yml    # Docker orchestration
 ├── Dockerfile            # Container configuration
 └── drizzle.config.ts     # Drizzle ORM configuration
@@ -156,6 +209,15 @@ POSTGRES_DB=threat_tracker
 # Application
 DATABASE_URL=postgres://threat_user:threat_pass@localhost:5432/threat_tracker
 NODE_ENV=development
+
+# AbuseIPDB API
+ABUSEIPDB_API_KEY=your_api_key_here
+
+# Cron Job Authentication
+CRON_SECRET=your_secure_random_string
+
+# Threat Ingestion (optional, for added security)
+THREAT_INGESTION_SECRET=another_secure_string
 
 # Docker Build Target (development | production)
 BUILD_TARGET=development
