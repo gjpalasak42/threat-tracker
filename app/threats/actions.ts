@@ -99,7 +99,7 @@ export async function ingestFromAbuseIPDB(
     // This uses Drizzle's query builder to express ON CONFLICT DO NOTHING for deduplication
     const result = await db.insert(threatLogs)
       .values(records)
-      .onConflictDoNothing()
+      .onConflictDoNothing({ target: [threatLogs.indicator, threatLogs.source] })
       .returning({ id: threatLogs.id });
 
     inserted = result.length;
