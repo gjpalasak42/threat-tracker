@@ -1,0 +1,23 @@
+# Code Owners for threat-tracker
+# These owners will be automatically requested for review when someone opens a pull request.
+
+# Default owner for everything in the repo
+* @gjpalasak42
+
+# GitHub specific files
+/.github/ @gjpalasak42
+
+# Documentation
+*.md @gjpalasak42
+
+# Configuration files
+*.json @gjpalasak42
+*.yml @gjpalasak42
+*.yaml @gjpalasak42
+*.ts @gjpalasak42
+*.mjs @gjpalasak42
+
+# Docker files
+Dockerfile @gjpalasak42
+docker-compose.yml @gjpalasak42
+.dockerignore @gjpalasak42
