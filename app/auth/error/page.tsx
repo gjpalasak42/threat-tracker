@@ -17,6 +17,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   Configuration: 'There is a problem with the server configuration.',
   AccessDenied: 'Access denied. You do not have permission to sign in.',
   Verification: 'The sign in link is no longer valid. It may have been used already or expired.',
+  AccountDeactivated: 'Your account has been deactivated. Please contact your administrator or support for assistance.',
   Default: 'An error occurred during authentication.',
 };
 
