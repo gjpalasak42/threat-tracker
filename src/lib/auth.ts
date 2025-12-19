@@ -39,6 +39,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // No adapter needed - we use JWT strategy and handle user ops manually
   session: {
     strategy: 'jwt', // Use JWT for serverless compatibility
+    // Explicitly set session maxAge (in seconds) to ensure sessions expire
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
     signIn: '/auth/login',
