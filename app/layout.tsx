@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { HeaderAuth } from "@/components/header-auth";
 
 const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-sans'});
 
@@ -38,6 +39,10 @@ export default function RootLayout({
               <SidebarTrigger className="-ml-1" />
               <div className="h-4 w-px bg-border" />
               <span className="text-xs text-muted-foreground">Security Operations Center</span>
+              {/* Spacer to push auth to the right */}
+              <div className="flex-1" />
+              {/* User auth section */}
+              <HeaderAuth />
             </header>
             <main className="flex-1 overflow-auto p-4">
               {children}
@@ -48,4 +53,3 @@ export default function RootLayout({
     </html>
   );
 }
-

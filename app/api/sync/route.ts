@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ingestFromAbuseIPDB } from '@/app/threats/actions';
 import { db } from '@/src/db/db';
 import { threatLogs } from '@/src/db/schema';
-import { max, sql } from 'drizzle-orm';
+import { max } from 'drizzle-orm';
 
 /**
  * Sync Endpoint for Cron Job

@@ -1,10 +1,10 @@
 # Threat Tracker
 
-> ⚠️ **Project Status**: This project is currently in active development. Features listed below are planned and may not be fully implemented yet.
-
 A modern threat intelligence tracking application built with Next.js, TypeScript, and PostgreSQL. Track and manage cybersecurity threat indicators with confidence scoring and multi-source support.
 
 ## Features
+
+### ✅ Implemented Features
 
 - 🔒 **OSINT Investigation Hub**: Complete security operations dashboard
 - 🔍 **IP Investigation**: Manual lookup against AbuseIPDB with detailed reports
@@ -15,6 +15,32 @@ A modern threat intelligence tracking application built with Next.js, TypeScript
 - 🗄️ **PostgreSQL Database**: Robust data persistence with Drizzle ORM
 - 🐳 **Docker Support**: Easy deployment with Docker Compose
 - ⚡ **Modern Stack**: Built with Next.js 16, React 19, and TypeScript
+- 🔐 **User Authentication**: Email/password authentication with session management
+
+### 🚧 Future Improvements
+
+#### Security Enhancements
+- 🛡️ **Rate Limiting & Brute Force Protection**: The authentication system currently lacks rate limiting or brute force protection mechanisms. Future implementation will include:
+  - Rate limiting on the login endpoint
+  - Account lockout after multiple failed attempts
+  - Redis integration to track and limit authentication attempts per IP address or email
+- � **User Enumeration Protection**: Registration currently reveals if an email exists. Future implementation will use a generic error message and email-based verification flow to prevent account enumeration attacks.
+- 📊 **SIEM Integration**: Security logs (unauthorized access attempts, etc.) should be sent to a proper security monitoring service in production rather than console.warn. Consider integrating with a SIEM or structured logging service.
+- 🔑 **Enhanced Password Policy**: Add special character requirements to the password validation (currently requires uppercase, lowercase, and number only).
+- ⚙️ **Configurable Bcrypt Rounds**: Make the bcrypt cost factor configurable via environment variable to allow adjusting as computing power increases.
+
+#### Feature Enhancements
+- �🔗 **Multi-Source Intelligence**: Integration with additional threat intelligence providers (VirusTotal, OTX, etc.)
+- 📈 **Analytics Dashboard**: Historical trend analysis and visualization of threat patterns
+- 🔔 **Alert Notifications**: Configurable alerts for high-severity threats via email/Slack
+- 🌍 **Geolocation Mapping**: Visual mapping of threat origins
+- 📝 **Threat Notes & Tagging**: User annotations and custom tagging for indicators
+- 🔄 **API Export**: RESTful API for external integrations and data export
+
+#### Code Quality & UX
+- 🔄 **Optimistic Updates with Rollback**: Admin page state updates should handle failures gracefully by refetching data or implementing proper rollback capabilities.
+- ♿ **Accessibility Improvements**: Replace Unicode loading spinners with accessible indicators using proper ARIA attributes and screen reader support.
+- 🧪 **Test Coverage**: Add comprehensive tests for authentication server actions and admin operations (role changes, user activation, kill switch management).
 
 ## Tech Stack
 

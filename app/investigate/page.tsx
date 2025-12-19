@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { investigateIp, type InvestigateResult } from './actions';
+import { investigateIp, getUserApiAccess, type InvestigateResult } from './actions';
 import { Search, Globe, Shield, AlertTriangle, Clock, Loader2, RefreshCw, Database } from 'lucide-react';
 
 function formatDate(dateStr: string | null): string {
@@ -23,6 +23,12 @@ export default function InvestigatePage() {
   const [ipAddress, setIpAddress] = useState('');
   const [result, setResult] = useState<InvestigateResult | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [hasApiAccess, setHasApiAccess] = useState(false);
+
+  // Check user's API access on mount
+  useEffect(() => {
+    getUserApiAccess().then(setHasApiAccess);
+  }, []);
 
   const handleSubmit = (e: React.FormEvent, forceRefresh: boolean = false) => {
     e.preventDefault();
@@ -122,8 +128,8 @@ export default function InvestigatePage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {/* Force Refresh Button */}
-                {result.fromCache && (
+                {/* Force Refresh Button - only show for users with API access */}
+                {result.fromCache && hasApiAccess && (
                   <Button 
                     variant="outline" 
                     size="sm"

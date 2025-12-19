@@ -1,0 +1,85 @@
+# =============================================================================
+# Production Docker Compose with Cloudflared Tunnel
+# =============================================================================
+# Usage: docker compose up -d
+# 
+# Requires CLOUDFLARED_TOKEN in .env file
+# Get token from: https://one.dash.cloudflare.com/ > Zero Trust > Access > Tunnels
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: threat-tracker-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-threat_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-threat_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-threat_tracker}
+    # No ports exposed in production - only internal network access
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-threat_user} -d ${POSTGRES_DB:-threat_tracker}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    user: postgres
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    networks:
+      - internal
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: threat-tracker-app
+    restart: unless-stopped
+    # No ports exposed in production - cloudflared handles external traffic
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-threat_user}:${POSTGRES_PASSWORD:-threat_pass}@db:5432/${POSTGRES_DB:-threat_tracker}
+      NODE_ENV: production
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET environment variable must be set for JWT signing in production}
+      AUTH_TRUST_HOST: "true"
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
+      ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY}
+      NEXT_PUBLIC_DISABLE_DEVTOOLS: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    networks:
+      - internal
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: threat-tracker-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TOKEN}
+    depends_on:
+      - app
+    networks:
+      - internal
+    # Cloudflared is stateless - no volumes needed
+    cap_drop:
+      - ALL
+    read_only: true
+
+networks:
+  internal:
+    driver: bridge

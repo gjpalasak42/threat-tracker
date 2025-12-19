@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployments
   output: 'standalone',
   
+  // Disable dev indicators in production (set NEXT_PUBLIC_DISABLE_DEVTOOLS=true)
+  devIndicators: process.env.NEXT_PUBLIC_DISABLE_DEVTOOLS === 'true' ? false : undefined,
+  
   // Security headers
   async headers() {
     return [

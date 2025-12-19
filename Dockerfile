@@ -40,9 +40,12 @@ FROM base AS production
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# NOTE: The following commands use the default root privileges of this base image
+# only at build time to create a dedicated non-root user. The production container
+# defined below runs as the unprivileged "nextjs" user for better security.
 # Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs nextjs
 
 # Copy built assets with proper ownership
 COPY --from=builder /app/public ./public
