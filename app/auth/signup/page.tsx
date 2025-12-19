@@ -126,10 +126,12 @@ export default function SignupPage() {
               disabled={isLoading}
             >
               {isLoading ? (
-                <>
-                  <span className="animate-spin mr-2">⟳</span>
+                <span role="status" aria-live="polite" className="inline-flex items-center">
+                  <span className="animate-spin mr-2" aria-hidden="true">
+                    ⟳
+                  </span>
                   Creating account...
-                </>
+                </span>
               ) : (
                 'Create Account'
               )}
