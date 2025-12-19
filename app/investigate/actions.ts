@@ -5,15 +5,36 @@
  * 
  * Wrapper around the AbuseIPDB check endpoint for IP investigation.
  * Uses database as cache to minimize API calls.
+ * 
+ * SECURITY: Requires API_USER or ADMIN role for external API calls.
+ * Cache-only lookups require STANDARD_USER or higher.
  */
 
 import { checkIp } from '@/src/lib/abuseipdb';
 import { db } from '@/src/db/db';
-import { threatLogs, type ThreatLog } from '@/src/db/schema';
+import { threatLogs, type ThreatLog, KILL_SWITCH_KEYS } from '@/src/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { isIP } from 'net';
+import { 
+  requireRole, 
+  requireRoleAndFeature,
+  getSession,
+  hasPermission,
+  type UnauthorizedResponse,
+  type KillSwitchBlockedResponse 
+} from '@/src/lib/auth-guards';
 
 const THREAT_SOURCE_ABUSEIPDB = 'AbuseIPDB';
+
+/**
+ * Check if the current user has API access (API_USER or ADMIN)
+ * Used to conditionally show/hide UI elements
+ */
+export async function getUserApiAccess(): Promise<boolean> {
+  const session = await getSession();
+  if (!session?.user?.role) return false;
+  return hasPermission(session.user.role, 'API_USER');
+}
 
 export interface InvestigateResult {
   success: boolean;
@@ -33,6 +54,7 @@ export interface InvestigateResult {
     usageType: string;
   };
   error?: string;
+  code?: number;
   rateLimit?: {
     remaining: number;
     limit: number;
@@ -72,13 +94,47 @@ function threatLogToResultData(log: ThreatLog): InvestigateResult['data'] {
 /**
  * Investigate an IP address
  * 
+ * SECURITY:
+ * - Cache lookups: Require STANDARD_USER or higher
+ * - External API calls (forceRefresh=true): Require API_USER or higher
+ * - Respects EXTERNAL_API_ENABLED kill switch
+ * 
  * @param ipAddress - The IP address to investigate
- * @param forceRefresh - If true, bypass cache and fetch from API
+ * @param forceRefresh - If true, bypass cache and fetch from API (requires API_USER role)
  */
 export async function investigateIp(
   ipAddress: string,
   forceRefresh: boolean = false
 ): Promise<InvestigateResult> {
+  // Determine required role: API_USER for external API calls, STANDARD_USER for cache
+  const requiredRole = forceRefresh ? 'API_USER' : 'STANDARD_USER';
+  
+  // Check authentication and role
+  const authResult = await requireRole(requiredRole);
+  if ('error' in authResult) {
+    return {
+      success: false,
+      fromCache: false,
+      error: authResult.error,
+      code: authResult.code,
+    };
+  }
+
+  // If forcing refresh (external API call), check kill switch
+  if (forceRefresh) {
+    const killSwitchResult = await requireRoleAndFeature('API_USER', KILL_SWITCH_KEYS.EXTERNAL_API_ENABLED);
+    if ('error' in killSwitchResult) {
+      return {
+        success: false,
+        fromCache: false,
+        error: 'code' in killSwitchResult && killSwitchResult.code === 503
+          ? 'External API queries are currently disabled'
+          : killSwitchResult.error,
+        code: killSwitchResult.code,
+      };
+    }
+  }
+
   // Validate IP address
   if (!ipAddress || typeof ipAddress !== 'string') {
     return {
@@ -119,9 +175,32 @@ export async function investigateIp(
           data: threatLogToResultData(cached[0]),
         };
       }
+      
+      // IP not found in cache - check if user has API access
+      // STANDARD_USER can only access cached data, not trigger new API calls
+      const userRole = authResult.session.user.role;
+      if (userRole === 'STANDARD_USER') {
+        return {
+          success: false,
+          fromCache: false,
+          error: 'IP not found in database. API access required to fetch new data.',
+          code: 403,
+        };
+      }
     } catch (error) {
-      // If cache lookup fails, continue to API call
+      // If cache lookup fails, continue to API call (for API_USER/ADMIN)
       console.error('Cache lookup failed:', error);
+      
+      // But if user is STANDARD_USER, don't fall back to API
+      const userRole = authResult.session.user.role;
+      if (userRole === 'STANDARD_USER') {
+        return {
+          success: false,
+          fromCache: false,
+          error: 'Database query failed. Please try again later.',
+          code: 500,
+        };
+      }
     }
   }
 
