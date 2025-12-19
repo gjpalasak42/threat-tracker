@@ -9,11 +9,12 @@
  * - Admin panel link for ADMIN users
  */
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { LogIn, LogOut, Shield, Zap } from 'lucide-react';
+import { LogIn, LogOut, Shield, Zap, AlertCircle } from 'lucide-react';
 import { signOutAction } from '@/app/auth/actions';
 
 interface UserNavProps {
@@ -26,16 +27,19 @@ interface UserNavProps {
 
 export function UserNav({ user }: UserNavProps) {
   const router = useRouter();
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   async function handleSignOut() {
+    setSignOutError(null);
     try {
       await signOutAction();
       router.push('/');
       router.refresh();
     } catch (error) {
       console.error('Error during sign out:', error);
-      // Show a simple error message to the user
-      alert('Failed to sign out. Please try again.');
+      setSignOutError('Sign out failed');
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setSignOutError(null), 5000);
     }
   }
 
@@ -83,6 +87,14 @@ export function UserNav({ user }: UserNavProps) {
             Admin Panel
           </Button>
         </Link>
+      )}
+
+      {/* Sign out error - inline display */}
+      {signOutError && (
+        <span className="inline-flex items-center gap-1 text-xs text-destructive">
+          <AlertCircle className="w-3 h-3" />
+          {signOutError}
+        </span>
       )}
 
       {/* Sign out button */}

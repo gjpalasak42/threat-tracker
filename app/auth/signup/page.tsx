@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserPlus, AlertCircle } from 'lucide-react';
+import { UserPlus, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -126,11 +126,9 @@ export default function SignupPage() {
               disabled={isLoading}
             >
               {isLoading ? (
-                <span role="status" aria-live="polite" className="inline-flex items-center">
-                  <span className="animate-spin mr-2" aria-hidden="true">
-                    ⟳
-                  </span>
-                  Creating account...
+                <span className="inline-flex items-center">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" aria-hidden="true" />
+                  <span>Creating account...</span>
                 </span>
               ) : (
                 'Create Account'
