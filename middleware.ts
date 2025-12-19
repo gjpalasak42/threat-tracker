@@ -40,11 +40,12 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(loginUrl);
       }
 
-      // Check if user is active; treat inactive users like unauthenticated ones
+      // Check if user is active; inactive users are redirected with a specific error
       if (!session.user.isActive) {
-        const loginUrl = new URL('/auth/login', request.url);
-        loginUrl.searchParams.set('callbackUrl', pathname);
-        return NextResponse.redirect(loginUrl);
+        const errorUrl = new URL('/auth/error', request.url);
+        errorUrl.searchParams.set('error', 'AccountDeactivated');
+        errorUrl.searchParams.set('callbackUrl', pathname);
+        return NextResponse.redirect(errorUrl);
       }
 
       // Check role using hierarchy-aware permission check
