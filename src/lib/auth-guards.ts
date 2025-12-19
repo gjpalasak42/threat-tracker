@@ -135,8 +135,8 @@ export async function isKillSwitchEnabled(key: string): Promise<boolean> {
     return !config[0].value;
   } catch (error) {
     console.error('Error checking kill switch:', error);
-    // On error, assume feature is enabled (fail open for now)
-    return false;
+    // On error, assume feature is disabled (fail closed) for security.
+    return true;
   }
 }
 
