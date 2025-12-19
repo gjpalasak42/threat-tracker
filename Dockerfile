@@ -40,9 +40,9 @@ FROM base AS production
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# NOTE: The following commands require the build container to run as root.
-# This is only needed at build time to create a dedicated non-root user;
-# the final runtime container runs as the unprivileged "nextjs" user.
+# NOTE: The following commands use the default root privileges of this base image
+# only at build time to create a dedicated non-root user. The production container
+# defined below runs as the unprivileged "nextjs" user for better security.
 # Create non-root user for security
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs nextjs
