@@ -29,9 +29,14 @@ const THREAT_SOURCE_ABUSEIPDB = 'AbuseIPDB';
  * Used to conditionally show/hide UI elements
  */
 export async function getUserApiAccess(): Promise<boolean> {
-  const session = await getSession();
-  if (!session?.user?.role) return false;
-  return hasPermission(session.user.role, 'API_USER');
+  try {
+    const session = await getSession();
+    if (!session?.user?.role) return false;
+    return hasPermission(session.user.role, 'API_USER');
+  } catch (error) {
+    console.error('Failed to retrieve session in getUserApiAccess', error);
+    return false;
+  }
 }
 
 export interface InvestigateResult {
