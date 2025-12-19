@@ -183,10 +183,11 @@ export async function investigateIp(
       // STANDARD_USER can only access cached data, not trigger new API calls
       const userRole = authResult.session.user.role;
       if (userRole === 'STANDARD_USER') {
+        console.warn('Authorization denied: STANDARD_USER attempted uncached IP lookup requiring API access.');
         return {
           success: false,
           fromCache: false,
-          error: 'IP not found in database. API access required to fetch new data.',
+          error: 'Unable to retrieve information for this IP address.',
           code: 403,
         };
       }
