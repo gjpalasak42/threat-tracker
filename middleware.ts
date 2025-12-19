@@ -38,9 +38,11 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(loginUrl);
       }
 
-      // Check if user is active
+      // Check if user is active; treat inactive users like unauthenticated ones
       if (!session.user.isActive) {
-        return NextResponse.redirect(new URL('/auth/error?error=AccessDenied', request.url));
+        const loginUrl = new URL('/auth/login', request.url);
+        loginUrl.searchParams.set('callbackUrl', pathname);
+        return NextResponse.redirect(loginUrl);
       }
 
       // Check role for admin routes
