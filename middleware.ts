@@ -14,6 +14,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { auth } from '@/src/lib/auth';
+import { hasPermission } from '@/src/lib/auth-guards';
+import type { UserRole } from '@/src/db/schema';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -45,14 +47,13 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(loginUrl);
       }
 
-      // Check role for admin routes
-      if (route.requiredRole === 'ADMIN' && session.user.role !== 'ADMIN') {
-        // User is authenticated but not admin - show access denied
+      // Check role using hierarchy-aware permission check
+      const userRole = session.user.role as UserRole;
+      const requiredRole = route.requiredRole as UserRole;
+      if (!hasPermission(userRole, requiredRole)) {
+        // User is authenticated but lacks required permissions
         return NextResponse.redirect(new URL('/auth/error?error=AccessDenied', request.url));
       }
-
-      // For STANDARD_USER routes, any authenticated user can access
-      // (role hierarchy handled in server actions)
     }
   }
 

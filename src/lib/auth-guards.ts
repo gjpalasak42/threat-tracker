@@ -116,10 +116,11 @@ export async function requireRole(requiredRole: UserRole): Promise<
 }
 
 /**
- * Check if a kill switch is enabled (blocking functionality)
- * Returns true if the feature is DISABLED (kill switch is ON)
+ * Check if a feature has been killed (disabled by kill switch)
+ * @returns true if the feature is DISABLED (kill switch is active/ON)
+ * @returns false if the feature is ENABLED (kill switch is inactive/OFF)
  */
-export async function isKillSwitchEnabled(key: string): Promise<boolean> {
+export async function isFeatureKilled(key: string): Promise<boolean> {
   try {
     const config = await db.select({ value: systemConfig.value })
       .from(systemConfig)
@@ -147,7 +148,7 @@ export async function isKillSwitchEnabled(key: string): Promise<boolean> {
 export async function requireFeatureEnabled(killSwitchKey: string): Promise<
   { allowed: true } | KillSwitchBlockedResponse
 > {
-  const isKilled = await isKillSwitchEnabled(killSwitchKey);
+  const isKilled = await isFeatureKilled(killSwitchKey);
 
   if (isKilled) {
     return {

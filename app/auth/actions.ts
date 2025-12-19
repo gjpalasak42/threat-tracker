@@ -8,7 +8,7 @@
 
 import { signIn, signOut, registerUser } from '@/src/lib/auth';
 import { loginSchema, signupSchema } from '@/src/lib/validations/auth';
-import { isKillSwitchEnabled, KILL_SWITCH_KEYS } from '@/src/lib/auth-guards';
+import { isFeatureKilled, KILL_SWITCH_KEYS } from '@/src/lib/auth-guards';
 import { AuthError } from 'next-auth';
 import { isRedirectError } from 'next/dist/client/components/redirect-error';
 
@@ -77,7 +77,7 @@ export async function signupAction(
   formData: FormData
 ): Promise<AuthActionResult> {
   // Check if registration is enabled
-  const registrationDisabled = await isKillSwitchEnabled(KILL_SWITCH_KEYS.REGISTRATION_ENABLED);
+  const registrationDisabled = await isFeatureKilled(KILL_SWITCH_KEYS.REGISTRATION_ENABLED);
   if (registrationDisabled) {
     return {
       success: false,
