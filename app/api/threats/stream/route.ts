@@ -94,7 +94,7 @@ export async function GET(request: Request) {
             controller.enqueue(
               encoder.encode(`event: heartbeat\ndata: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`)
             );
-          } catch (error) {
+          } catch {
             // Connection closed during send, clean up
             isConnected = false;
             if (heartbeatInterval) {

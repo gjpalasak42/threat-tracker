@@ -20,8 +20,6 @@ import {
   requireRoleAndFeature,
   getSession,
   hasPermission,
-  type UnauthorizedResponse,
-  type KillSwitchBlockedResponse 
 } from '@/src/lib/auth-guards';
 
 const THREAT_SOURCE_ABUSEIPDB = 'AbuseIPDB';

@@ -10,7 +10,7 @@
 import { db } from '@/src/db/db';
 import { users, systemConfig, KILL_SWITCH_KEYS, type UserRole } from '@/src/db/schema';
 import { requireRole } from '@/src/lib/auth-guards';
-import { eq, desc, ne } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 export interface UserListItem {
   id: string;
@@ -188,7 +188,7 @@ export async function updateKillSwitch(
 
   // Validate key
   const validKeys = Object.values(KILL_SWITCH_KEYS);
-  if (!validKeys.includes(key as any)) {
+  if (!validKeys.includes(key as typeof validKeys[number])) {
     return { success: false, error: 'Invalid configuration key' };
   }
 

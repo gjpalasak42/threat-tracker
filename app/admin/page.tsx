@@ -39,18 +39,6 @@ import { Shield, Users, Settings, AlertTriangle, RefreshCw } from 'lucide-react'
 
 type UserRole = 'ADMIN' | 'API_USER' | 'STANDARD_USER';
 
-const ROLE_COLORS: Record<UserRole, string> = {
-  ADMIN: 'bg-red-500/20 text-red-400 border-red-500/30',
-  API_USER: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  STANDARD_USER: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-};
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  ADMIN: 'Admin',
-  API_USER: 'API User',
-  STANDARD_USER: 'Standard User',
-};
-
 export default function AdminPage() {
   const router = useRouter();
   const [users, setUsers] = useState<UserListItem[]>([]);
