@@ -28,9 +28,15 @@ export function UserNav({ user }: UserNavProps) {
   const router = useRouter();
 
   async function handleSignOut() {
-    await signOutAction();
-    router.push('/');
-    router.refresh();
+    try {
+      await signOutAction();
+      router.push('/');
+      router.refresh();
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      // Show a simple error message to the user
+      alert('Failed to sign out. Please try again.');
+    }
   }
 
   // Not authenticated - show Sign In button
