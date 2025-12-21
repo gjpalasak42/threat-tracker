@@ -38,6 +38,22 @@ services:
     networks:
       - internal
 
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: threat-tracker-migrate
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-threat_user}:${POSTGRES_PASSWORD:-threat_pass}@db:5432/${POSTGRES_DB:-threat_tracker}
+    command: ["bun", "run", "db:migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
+
   app:
     build:
       context: .
@@ -57,12 +73,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     cap_drop:
       - ALL
     cap_add:
       - NET_BIND_SERVICE
     networks:
       - internal
+
 
   cloudflared:
     image: cloudflare/cloudflared:latest

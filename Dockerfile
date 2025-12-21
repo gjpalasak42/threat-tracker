@@ -21,7 +21,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_ENV=development
 EXPOSE 3000
-CMD ["bun", "run", "dev"]
+# Sync schema and start dev server (--force skips interactive prompts)
+CMD ["sh", "-c", "bunx drizzle-kit push --force && bun run dev"]
 
 # ============================================
 # Builder stage (production build)
