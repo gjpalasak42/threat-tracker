@@ -19,11 +19,13 @@ interface ThreatTableProps {
 
 function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
+  // Use UTC to prevent hydration mismatch between server and client timezones
   return d.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'UTC',
   });
 }
 
