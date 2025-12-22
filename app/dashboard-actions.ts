@@ -7,8 +7,8 @@
  */
 
 import { db } from '@/src/db/db';
-import { threatLogs } from '@/src/db/schema';
-import { count, max } from 'drizzle-orm';
+import { threatLogs, systemConfig, SYSTEM_CONFIG_KEYS } from '@/src/db/schema';
+import { count, max, eq, or } from 'drizzle-orm';
 
 export interface DashboardMetrics {
   totalRecords: number;
@@ -32,3 +32,73 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     lastSyncTime,
   };
 }
+
+export interface SyncStatus {
+  abuseipdb: {
+    lastSync: string | null;
+    enabled: boolean;
+  };
+  otx: {
+    lastSync: string | null;
+    enabled: boolean;
+  };
+}
+
+/**
+ * Get sync status for all threat intelligence sources
+ * Used by the sidebar to display system health
+ */
+export async function getSyncStatus(): Promise<SyncStatus> {
+  try {
+    // Get all sync-related config entries
+    const configs = await db.select()
+      .from(systemConfig)
+      .where(
+        or(
+          eq(systemConfig.key, SYSTEM_CONFIG_KEYS.LAST_OTX_SYNC),
+          eq(systemConfig.key, SYSTEM_CONFIG_KEYS.LAST_ABUSEIPDB_SYNC)
+        )
+      );
+
+    const otxConfig = configs.find(c => c.key === SYSTEM_CONFIG_KEYS.LAST_OTX_SYNC);
+    const abuseConfig = configs.find(c => c.key === SYSTEM_CONFIG_KEYS.LAST_ABUSEIPDB_SYNC);
+
+    // Get last sync time for AbuseIPDB - prefer config entry, fallback to threat_logs
+    let abuseLastSync = abuseConfig?.updatedAt?.toISOString() ?? null;
+    if (!abuseLastSync) {
+      // Fallback: check most recent AbuseIPDB indicator in threat_logs
+      const lastEntry = await db.select({ value: max(threatLogs.createdAt) })
+        .from(threatLogs)
+        .where(eq(threatLogs.source, 'AbuseIPDB'));
+      abuseLastSync = lastEntry[0]?.value?.toISOString() ?? null;
+    }
+
+    // Get last sync time for OTX - prefer config entry, fallback to threat_logs
+    let otxLastSync = otxConfig?.updatedAt?.toISOString() ?? null;
+    if (!otxLastSync) {
+      // Fallback: check most recent OTX indicator in threat_logs
+      const lastEntry = await db.select({ value: max(threatLogs.createdAt) })
+        .from(threatLogs)
+        .where(eq(threatLogs.source, 'OTX'));
+      otxLastSync = lastEntry[0]?.value?.toISOString() ?? null;
+    }
+
+    return {
+      abuseipdb: {
+        lastSync: abuseLastSync,
+        enabled: !!process.env.ABUSEIPDB_API_KEY,
+      },
+      otx: {
+        lastSync: otxLastSync,
+        enabled: !!process.env.OTX_API_KEY,
+      },
+    };
+  } catch (error) {
+    console.error('Failed to get sync status:', error);
+    return {
+      abuseipdb: { lastSync: null, enabled: false },
+      otx: { lastSync: null, enabled: false },
+    };
+  }
+}
+

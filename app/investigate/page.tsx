@@ -5,8 +5,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { investigateIp, getUserApiAccess, type InvestigateResult } from './actions';
-import { Search, Globe, Shield, AlertTriangle, Clock, Loader2, RefreshCw, Database } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { 
+  investigateIp, 
+  investigateIpMultiSource, 
+  getUserApiAccess, 
+  type InvestigateResult 
+} from './actions';
+import { RiskGauge } from '@/components/risk-gauge';
+import { SourceBreakdown } from '@/components/source-breakdown';
+import { 
+  Search, 
+  Globe, 
+  Shield, 
+  AlertTriangle, 
+  Clock, 
+  Loader2, 
+  RefreshCw, 
+  Database,
+  Layers
+} from 'lucide-react';
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'Never';
@@ -24,6 +42,7 @@ export default function InvestigatePage() {
   const [result, setResult] = useState<InvestigateResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const [hasApiAccess, setHasApiAccess] = useState(false);
+  const [useMultiSource, setUseMultiSource] = useState(true);
 
   // Check user's API access on mount
   useEffect(() => {
@@ -35,8 +54,14 @@ export default function InvestigatePage() {
     if (!ipAddress.trim()) return;
 
     startTransition(async () => {
-      const res = await investigateIp(ipAddress, forceRefresh);
-      setResult(res);
+      // Use multi-source lookup if user has API access and toggle is on
+      if (hasApiAccess && useMultiSource && !forceRefresh) {
+        const res = await investigateIpMultiSource(ipAddress);
+        setResult(res);
+      } else {
+        const res = await investigateIp(ipAddress, forceRefresh);
+        setResult(res);
+      }
     });
   };
 
@@ -44,8 +69,13 @@ export default function InvestigatePage() {
     if (!result?.data?.ipAddress) return;
     
     startTransition(async () => {
-      const res = await investigateIp(result.data!.ipAddress, true);
-      setResult(res);
+      if (hasApiAccess && useMultiSource) {
+        const res = await investigateIpMultiSource(result.data!.ipAddress);
+        setResult(res);
+      } else {
+        const res = await investigateIp(result.data!.ipAddress, true);
+        setResult(res);
+      }
     });
   };
 
@@ -54,7 +84,7 @@ export default function InvestigatePage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Investigate IP</h1>
         <p className="text-sm text-muted-foreground">
-          Manually check an IP address against AbuseIPDB (cached results shown when available)
+          Check an IP address against multiple threat intelligence sources
         </p>
       </div>
 
@@ -69,7 +99,7 @@ export default function InvestigatePage() {
             Enter an IP address to check its abuse history and reputation
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <form onSubmit={(e) => handleSubmit(e, false)} className="flex gap-2">
             <Input
               type="text"
@@ -93,6 +123,27 @@ export default function InvestigatePage() {
               )}
             </Button>
           </form>
+          
+          {/* Multi-source toggle - only show for API users */}
+          {hasApiAccess && (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant={useMultiSource ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setUseMultiSource(!useMultiSource)}
+                className="gap-2"
+              >
+                <Layers className="h-3 w-3" />
+                {useMultiSource ? 'Multi-Source: ON' : 'Multi-Source: OFF'}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {useMultiSource 
+                  ? 'Queries AbuseIPDB + AlienVault OTX'
+                  : 'Queries AbuseIPDB only (uses cache when available)'}
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -126,10 +177,17 @@ export default function InvestigatePage() {
                     Live
                   </Badge>
                 )}
+                {/* Multi-source indicator */}
+                {result.sourcesData && (
+                  <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/30">
+                    <Layers className="mr-1 h-3 w-3" />
+                    Multi-Source
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {/* Force Refresh Button - only show for users with API access */}
-                {result.fromCache && hasApiAccess && (
+                {hasApiAccess && (
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -141,85 +199,110 @@ export default function InvestigatePage() {
                     ) : (
                       <RefreshCw className="h-3 w-3" />
                     )}
-                    Refresh from API
+                    Refresh
                   </Button>
                 )}
-                <Badge 
-                  variant={result.data.abuseConfidenceScore > 75 ? 'destructive' : result.data.abuseConfidenceScore > 25 ? 'default' : 'secondary'}
-                  className="text-sm"
-                >
-                  {result.data.abuseConfidenceScore > 75 ? 'Confirmed Threat' : result.data.abuseConfidenceScore > 25 ? 'Suspicious' : 'Clean'}
-                </Badge>
               </div>
             </div>
             <CardDescription>
               {result.fromCache 
                 ? `Cached data from ${formatDate(result.cachedAt ?? null)}`
-                : 'Live analysis from AbuseIPDB'}
+                : result.sourcesData 
+                  ? 'Live analysis from AbuseIPDB + AlienVault OTX'
+                  : 'Live analysis from AbuseIPDB'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Main Score */}
-            <div className="flex items-center gap-4">
-              <div className={`flex h-16 w-16 items-center justify-center rounded-full ${
-                result.data.abuseConfidenceScore > 75 
-                  ? 'bg-destructive/10 text-destructive' 
-                  : result.data.abuseConfidenceScore > 25 
-                    ? 'bg-yellow-500/10 text-yellow-500'
-                    : 'bg-emerald-500/10 text-emerald-500'
-              }`}>
-                <span className="text-xl font-bold">{result.data.abuseConfidenceScore}%</span>
-              </div>
-              <div>
-                <div className="text-lg font-medium">Abuse Confidence Score</div>
-                <p className="text-sm text-muted-foreground">
-                  Based on {result.data.totalReports} reports from the community
-                </p>
-              </div>
-            </div>
+            {/* Unified Risk Score - show if available */}
+            {result.unifiedRisk && (
+              <>
+                <RiskGauge
+                  score={result.unifiedRisk.score}
+                  showBreakdown={true}
+                  breakdown={result.unifiedRisk.breakdown}
+                  sources={result.unifiedRisk.sources}
+                  size="md"
+                />
+                <Separator />
+              </>
+            )}
 
-            {/* Details Grid */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="flex items-start gap-3">
-                <Globe className="mt-0.5 h-4 w-4 text-muted-foreground" />
+            {/* Legacy single-source score display */}
+            {!result.unifiedRisk && (
+              <div className="flex items-center gap-4">
+                <div className={`flex h-16 w-16 items-center justify-center rounded-full ${
+                  result.data.abuseConfidenceScore > 75 
+                    ? 'bg-destructive/10 text-destructive' 
+                    : result.data.abuseConfidenceScore > 25 
+                      ? 'bg-yellow-500/10 text-yellow-500'
+                      : 'bg-emerald-500/10 text-emerald-500'
+                }`}>
+                  <span className="text-xl font-bold">{result.data.abuseConfidenceScore}%</span>
+                </div>
                 <div>
-                  <div className="text-sm font-medium">Country</div>
-                  <div className="text-sm text-muted-foreground">
-                    {result.data.countryName} ({result.data.countryCode})
+                  <div className="text-lg font-medium">Abuse Confidence Score</div>
+                  <p className="text-sm text-muted-foreground">
+                    Based on {result.data.totalReports} reports from the community
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Source Breakdown Tabs - show if multi-source data available */}
+            {result.sourcesData && (result.sourcesData.abuseipdb || result.sourcesData.otx) && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">Source Breakdown</h3>
+                  <SourceBreakdown sourcesData={result.sourcesData} />
+                </div>
+              </>
+            )}
+
+            {/* Details Grid - show for non-multi-source results */}
+            {!result.sourcesData && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="flex items-start gap-3">
+                  <Globe className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm font-medium">Country</div>
+                    <div className="text-sm text-muted-foreground">
+                      {result.data.countryName} ({result.data.countryCode})
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Clock className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm font-medium">Last Reported</div>
+                    <div className="text-sm text-muted-foreground">
+                      {formatDate(result.data.lastReportedAt)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Shield className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm font-medium">ISP</div>
+                    <div className="text-sm text-muted-foreground">
+                      {result.data.isp || 'Unknown'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <div className="text-sm font-medium">Usage Type</div>
+                    <div className="text-sm text-muted-foreground">
+                      {result.data.usageType || 'Unknown'}
+                    </div>
                   </div>
                 </div>
               </div>
-
-              <div className="flex items-start gap-3">
-                <Clock className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                <div>
-                  <div className="text-sm font-medium">Last Reported</div>
-                  <div className="text-sm text-muted-foreground">
-                    {formatDate(result.data.lastReportedAt)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <Shield className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                <div>
-                  <div className="text-sm font-medium">ISP</div>
-                  <div className="text-sm text-muted-foreground">
-                    {result.data.isp || 'Unknown'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                <div>
-                  <div className="text-sm font-medium">Usage Type</div>
-                  <div className="text-sm text-muted-foreground">
-                    {result.data.usageType || 'Unknown'}
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Additional Info */}
             <div className="flex flex-wrap gap-2">

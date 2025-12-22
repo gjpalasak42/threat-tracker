@@ -3,7 +3,7 @@
 /**
  * Admin Panel Page
  * 
- * User management and system configuration for administrators
+ * User management, system configuration, and threat intelligence controls
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -14,8 +14,13 @@ import {
   toggleUserActive,
   getSystemConfig,
   updateKillSwitch,
+  getThreatIntelStatus,
+  triggerAbuseIPDBSync,
+  triggerOTXSync,
   type UserListItem,
   type SystemConfigItem,
+  type SyncStatusInfo,
+  type TriggerSyncResult,
 } from './actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,27 +40,65 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Shield, Users, Settings, AlertTriangle, RefreshCw } from 'lucide-react';
+import { 
+  Shield, 
+  Users, 
+  Settings, 
+  AlertTriangle, 
+  RefreshCw, 
+  Database, 
+  CheckCircle2, 
+  XCircle,
+  Clock,
+  Download,
+  Loader2
+} from 'lucide-react';
 
 type UserRole = 'ADMIN' | 'API_USER' | 'STANDARD_USER';
+
+function formatRelativeTime(dateStr: string | null): string {
+  if (!dateStr) return 'Never';
+  
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} minutes ago`;
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  if (diffDays < 7) return `${diffDays} days ago`;
+  
+  return date.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric',
+    year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+  });
+}
 
 export default function AdminPage() {
   const router = useRouter();
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [config, setConfig] = useState<SystemConfigItem[]>([]);
+  const [threatIntelSources, setThreatIntelSources] = useState<SyncStatusInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const [updatingConfig, setUpdatingConfig] = useState<string | null>(null);
+  const [syncingSource, setSyncingSource] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const [usersResult, configResult] = await Promise.all([
+      const [usersResult, configResult, threatIntelResult] = await Promise.all([
         getAllUsers(),
         getSystemConfig(),
+        getThreatIntelStatus(),
       ]);
 
       if (!usersResult.success) {
@@ -74,6 +117,10 @@ export default function AdminPage() {
 
       setUsers(usersResult.users);
       setConfig(configResult.config);
+      
+      if (threatIntelResult.success) {
+        setThreatIntelSources(threatIntelResult.sources);
+      }
     } catch {
       setError('Failed to load admin data');
     } finally {
@@ -84,6 +131,14 @@ export default function AdminPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Clear success message after 5 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timeout = setTimeout(() => setSuccessMessage(null), 5000);
+      return () => clearTimeout(timeout);
+    }
+  }, [successMessage]);
 
   async function handleRoleChange(userId: string, newRole: UserRole) {
     setUpdatingUserId(userId);
@@ -127,6 +182,34 @@ export default function AdminPage() {
     setUpdatingConfig(null);
   }
 
+  async function handleSync(source: 'AbuseIPDB' | 'OTX') {
+    setSyncingSource(source);
+    setError(null);
+    
+    let result: TriggerSyncResult;
+    
+    if (source === 'AbuseIPDB') {
+      result = await triggerAbuseIPDBSync();
+    } else {
+      result = await triggerOTXSync();
+    }
+    
+    if (result.success) {
+      setSuccessMessage(
+        `${source} sync completed: ${result.inserted ?? 0} inserted, ${result.updated ?? 0} updated`
+      );
+      // Refresh threat intel status
+      const statusResult = await getThreatIntelStatus();
+      if (statusResult.success) {
+        setThreatIntelSources(statusResult.sources);
+      }
+    } else {
+      setError(result.error || `${source} sync failed`);
+    }
+    
+    setSyncingSource(null);
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -141,10 +224,19 @@ export default function AdminPage() {
         <Shield className="w-8 h-8 text-primary" />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Admin Panel</h1>
-          <p className="text-muted-foreground">Manage users and system settings</p>
+          <p className="text-muted-foreground">Manage users, system settings, and threat intelligence</p>
         </div>
       </div>
 
+      {/* Success Message */}
+      {successMessage && (
+        <div className="flex items-center gap-2 p-4 text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+          <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+          <span>{successMessage}</span>
+        </div>
+      )}
+
+      {/* Error Message */}
       {error && (
         <div className="flex items-center gap-2 p-4 text-destructive bg-destructive/10 border border-destructive/20 rounded-lg">
           <AlertTriangle className="w-5 h-5 flex-shrink-0" />
@@ -154,6 +246,85 @@ export default function AdminPage() {
           </Button>
         </div>
       )}
+
+      {/* Threat Intelligence Sources */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Database className="w-5 h-5 text-muted-foreground" />
+            <CardTitle>Threat Intelligence Sources</CardTitle>
+          </div>
+          <CardDescription>
+            Monitor and manually trigger bulk sync from external threat intelligence providers
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {threatIntelSources.map((source) => (
+              <div 
+                key={source.source}
+                className="flex items-center justify-between p-4 border rounded-lg bg-muted/30"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                    source.enabled ? 'bg-emerald-500/10' : 'bg-muted'
+                  }`}>
+                    {source.enabled ? (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">{source.source}</p>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Database className="h-3 w-3" />
+                        {source.indicatorCount.toLocaleString()} indicators
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatRelativeTime(source.lastSync)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!source.enabled && (
+                    <Badge variant="secondary" className="text-xs">
+                      API key not configured
+                    </Badge>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSync(source.source)}
+                    disabled={!source.enabled || syncingSource !== null}
+                  >
+                    {syncingSource === source.source ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-1" />
+                        Sync Now
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ))}
+            
+            {threatIntelSources.length === 0 && (
+              <div className="text-center text-muted-foreground py-4">
+                No threat intelligence sources configured
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Kill Switches */}
       <Card>

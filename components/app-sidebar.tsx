@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -12,9 +13,12 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarFooter,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, Search, Activity, Shield } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { LayoutDashboard, Search, Activity, Shield, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { getSyncStatus, type SyncStatus } from '@/app/dashboard-actions';
 
 const navItems = [
   {
@@ -34,8 +38,38 @@ const navItems = [
   },
 ];
 
+function formatRelativeTime(dateStr: string | null): string {
+  if (!dateStr) return 'Never';
+  
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+
+  useEffect(() => {
+    getSyncStatus().then(setSyncStatus);
+    
+    // Refresh every 5 minutes
+    const interval = setInterval(() => {
+      getSyncStatus().then(setSyncStatus);
+    }, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <Sidebar>
@@ -75,8 +109,63 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      
+      {/* System Health Footer */}
+      <SidebarFooter className="border-t border-sidebar-border">
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-xs">System Health</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <div className="space-y-2 px-2 py-1">
+              {/* AbuseIPDB Status */}
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5">
+                  {syncStatus?.abuseipdb.enabled ? (
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                  ) : (
+                    <XCircle className="h-3 w-3 text-muted-foreground" />
+                  )}
+                  <span className="text-muted-foreground">AbuseIPDB</span>
+                </div>
+                {syncStatus?.abuseipdb.lastSync && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    <Clock className="h-2 w-2 mr-1" />
+                    {formatRelativeTime(syncStatus.abuseipdb.lastSync)}
+                  </Badge>
+                )}
+              </div>
+              
+              {/* OTX Status */}
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5">
+                  {syncStatus?.otx.enabled ? (
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                  ) : (
+                    <XCircle className="h-3 w-3 text-muted-foreground" />
+                  )}
+                  <span className="text-muted-foreground">AlienVault OTX</span>
+                </div>
+                {syncStatus?.otx.enabled && syncStatus?.otx.lastSync && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    <Clock className="h-2 w-2 mr-1" />
+                    {formatRelativeTime(syncStatus.otx.lastSync)}
+                  </Badge>
+                )}
+                {syncStatus?.otx.enabled && !syncStatus?.otx.lastSync && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    Pending
+                  </Badge>
+                )}
+                {!syncStatus?.otx.enabled && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-muted-foreground">
+                    Not configured
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
 }
-
