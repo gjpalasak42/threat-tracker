@@ -208,7 +208,8 @@ export default function AdminPage() {
     
     if (result.success) {
       setSuccessMessage(
-        `${source} sync completed: ${result.inserted ?? 0} inserted, ${result.updated ?? 0} updated`
+        `${source} sync completed: ${result.inserted ?? 0} inserted` +
+        (result.updated !== undefined ? `, ${result.updated} updated` : '')
       );
       // Refresh threat intel status
       const statusResult = await getThreatIntelStatus();
