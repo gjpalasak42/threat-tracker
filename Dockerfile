@@ -25,6 +25,18 @@ EXPOSE 3000
 CMD ["sh", "-c", "bunx drizzle-kit push --force && bun run dev"]
 
 # ============================================
+# Migration stage (for running DB migrations)
+# ============================================
+FROM base AS migrate
+COPY --from=deps /app/node_modules ./node_modules
+COPY drizzle.config.ts ./
+COPY drizzle ./drizzle
+COPY src/db ./src/db
+ENV NODE_ENV=production
+# Run migrations and exit
+CMD ["bunx", "drizzle-kit", "migrate"]
+
+# ============================================
 # Builder stage (production build)
 # ============================================
 FROM base AS builder

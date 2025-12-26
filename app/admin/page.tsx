@@ -17,10 +17,13 @@ import {
   getThreatIntelStatus,
   triggerAbuseIPDBSync,
   triggerOTXSync,
+  getLockedAccountsAdmin,
+  unlockAccountAdmin,
   type UserListItem,
   type SystemConfigItem,
   type SyncStatusInfo,
   type TriggerSyncResult,
+  type AccountLockoutInfo,
 } from './actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,7 +54,9 @@ import {
   XCircle,
   Clock,
   Download,
-  Loader2
+  Loader2,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 type UserRole = 'ADMIN' | 'API_USER' | 'STANDARD_USER';
@@ -83,22 +88,25 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [config, setConfig] = useState<SystemConfigItem[]>([]);
   const [threatIntelSources, setThreatIntelSources] = useState<SyncStatusInfo[]>([]);
+  const [lockedAccounts, setLockedAccounts] = useState<AccountLockoutInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const [updatingConfig, setUpdatingConfig] = useState<string | null>(null);
   const [syncingSource, setSyncingSource] = useState<string | null>(null);
+  const [unlockingEmail, setUnlockingEmail] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const [usersResult, configResult, threatIntelResult] = await Promise.all([
+      const [usersResult, configResult, threatIntelResult, lockoutsResult] = await Promise.all([
         getAllUsers(),
         getSystemConfig(),
         getThreatIntelStatus(),
+        getLockedAccountsAdmin(),
       ]);
 
       if (!usersResult.success) {
@@ -120,6 +128,10 @@ export default function AdminPage() {
       
       if (threatIntelResult.success) {
         setThreatIntelSources(threatIntelResult.sources);
+      }
+      
+      if (lockoutsResult.success) {
+        setLockedAccounts(lockoutsResult.lockouts);
       }
     } catch {
       setError('Failed to load admin data');
@@ -210,6 +222,23 @@ export default function AdminPage() {
     setSyncingSource(null);
   }
 
+  async function handleUnlockAccount(email: string) {
+    setUnlockingEmail(email);
+    setError(null);
+    
+    const result = await unlockAccountAdmin(email);
+    
+    if (result.success) {
+      setSuccessMessage(`Account ${email} has been unlocked`);
+      // Remove from local state
+      setLockedAccounts(prev => prev.filter(l => l.email !== email));
+    } else {
+      setError(result.error || 'Failed to unlock account');
+    }
+    
+    setUnlockingEmail(null);
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -245,6 +274,74 @@ export default function AdminPage() {
             Dismiss
           </Button>
         </div>
+      )}
+
+      {/* Account Lockouts */}
+      {lockedAccounts.length > 0 && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-amber-500" />
+              <CardTitle className="text-amber-500">Account Lockouts</CardTitle>
+              <Badge variant="outline" className="ml-2 bg-amber-500/10 text-amber-500 border-amber-500/30">
+                {lockedAccounts.length}
+              </Badge>
+            </div>
+            <CardDescription>
+              Accounts locked due to failed login attempts. Unlock to allow users to attempt login again.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Failed Attempts</TableHead>
+                  <TableHead>Locked Until</TableHead>
+                  <TableHead>Last Attempt IP</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lockedAccounts.map((lockout) => (
+                  <TableRow key={lockout.email}>
+                    <TableCell className="font-medium">{lockout.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="destructive">{lockout.failedAttempts}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {lockout.lockedUntil ? formatRelativeTime(lockout.lockedUntil) : 'N/A'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground font-mono text-sm">
+                      {lockout.lastAttemptIp || 'Unknown'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleUnlockAccount(lockout.email)}
+                        disabled={unlockingEmail === lockout.email}
+                        className="border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                      >
+                        {unlockingEmail === lockout.email ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                            Unlocking...
+                          </>
+                        ) : (
+                          <>
+                            <Unlock className="w-4 h-4 mr-1" />
+                            Unlock
+                          </>
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
       {/* Threat Intelligence Sources */}

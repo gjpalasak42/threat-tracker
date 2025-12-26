@@ -81,6 +81,32 @@ export const verificationTokens = pgTable('verification_tokens', {
 ]);
 
 // =============================================================================
+// Account Lockouts (Rate Limiting & Brute Force Protection)
+// =============================================================================
+
+/**
+ * Account lockouts table for tracking failed login attempts
+ * Used for brute force protection and rate limiting
+ */
+export const accountLockouts = pgTable('account_lockouts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(), // For pre-registration lockouts
+  failedAttempts: integer('failed_attempts').default(0).notNull(),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }).defaultNow().notNull(),
+  lastAttemptIp: text('last_attempt_ip'),
+  unlockedBy: uuid('unlocked_by').references(() => users.id),
+  unlockedAt: timestamp('unlocked_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('uq_lockouts_email').on(table.email),
+]);
+
+// Account lockout types
+export type AccountLockout = typeof accountLockouts.$inferSelect;
+export type NewAccountLockout = typeof accountLockouts.$inferInsert;
+
+// =============================================================================
 // System Configuration (Kill Switches)
 // =============================================================================
 

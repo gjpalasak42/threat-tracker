@@ -510,3 +510,57 @@ export async function triggerOTXSync(): Promise<TriggerSyncResult> {
   }
 }
 
+// =============================================================================
+// Account Lockout Management
+// =============================================================================
+
+import { 
+  getLockedAccounts as getRateLimitLockedAccounts, 
+  unlockAccount as rateLimitUnlockAccount,
+  type AccountLockoutInfo,
+} from '@/src/lib/rate-limiter';
+
+// Re-export the type for admin page
+export type { AccountLockoutInfo };
+
+/**
+ * Get all currently locked accounts (admin only)
+ */
+export async function getLockedAccountsAdmin(): Promise<
+  { success: true; lockouts: AccountLockoutInfo[] } | { success: false; error: string }
+> {
+  const authResult = await requireRole('ADMIN');
+  if ('error' in authResult) {
+    return { success: false, error: authResult.error };
+  }
+
+  try {
+    const lockouts = await getRateLimitLockedAccounts();
+    return { success: true, lockouts };
+  } catch (error) {
+    console.error('Failed to get locked accounts:', error);
+    return { success: false, error: 'Failed to fetch locked accounts' };
+  }
+}
+
+/**
+ * Unlock a locked account (admin only)
+ */
+export async function unlockAccountAdmin(email: string): Promise<AdminActionResult> {
+  const authResult = await requireRole('ADMIN');
+  if ('error' in authResult) {
+    return { success: false, error: authResult.error };
+  }
+
+  if (!email || typeof email !== 'string' || email.trim().length === 0) {
+    return { success: false, error: 'Invalid email provided' };
+  }
+
+  try {
+    const result = await rateLimitUnlockAccount(email, authResult.session.user.id);
+    return result;
+  } catch (error) {
+    console.error('Failed to unlock account:', error);
+    return { success: false, error: 'Failed to unlock account' };
+  }
+}
