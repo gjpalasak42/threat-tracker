@@ -517,11 +517,17 @@ export async function triggerOTXSync(): Promise<TriggerSyncResult> {
 import { 
   getLockedAccounts as getRateLimitLockedAccounts, 
   unlockAccount as rateLimitUnlockAccount,
-  type AccountLockoutInfo,
 } from '@/src/lib/rate-limiter';
 
-// Re-export the type for admin page
-export type { AccountLockoutInfo };
+// Define the interface here (matches the one in rate-limiter.ts)
+export interface AccountLockoutInfo {
+  email: string;
+  failedAttempts: number;
+  lockedUntil: string | null;
+  lastAttemptAt: string;
+  lastAttemptIp: string | null;
+  userId: string | null;
+}
 
 /**
  * Get all currently locked accounts (admin only)

@@ -38,22 +38,6 @@ services:
     networks:
       - internal
 
-  # Migration service - runs once and exits
-  migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: migrate
-    container_name: threat-tracker-migrate
-    environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-threat_user}:${POSTGRES_PASSWORD:-threat_pass}@db:5432/${POSTGRES_DB:-threat_tracker}
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - internal
-    # This service runs once and exits after migrations complete
-
   app:
     build:
       context: .
@@ -75,8 +59,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
     cap_drop:
       - ALL
     cap_add:
