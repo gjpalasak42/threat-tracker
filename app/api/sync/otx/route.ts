@@ -4,7 +4,7 @@ import { threatLogs, systemConfig, SYSTEM_CONFIG_KEYS, type SourcesData, type OT
 import { getSubscribedPulses, mapOTXTypeToInternal, type OTXPulseWithIndicators } from '@/src/lib/otx';
 import { calculateUnifiedRisk } from '@/src/lib/deconfliction';
 import { logApiCall } from '@/src/lib/audit-logger';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 /**
  * OTX Sync Endpoint for Cron Job
@@ -132,15 +132,10 @@ export async function POST(request: NextRequest) {
         };
 
         try {
-          // Check if indicator already exists
+          // Check if indicator already exists (any source - unique index is on indicator alone)
           const existing = await db.select()
             .from(threatLogs)
-            .where(
-              and(
-                eq(threatLogs.indicator, indicator.indicator),
-                eq(threatLogs.source, THREAT_SOURCE_OTX)
-              )
-            )
+            .where(eq(threatLogs.indicator, indicator.indicator))
             .limit(1);
 
           if (existing.length > 0) {

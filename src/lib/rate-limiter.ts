@@ -322,11 +322,6 @@ export async function checkRegistrationRateLimit(ip: string): Promise<RateLimitR
 export async function recordRegistrationAttempt(ip: string): Promise<void> {
   const ipData = getIpAttempt(ip);
   ipData.count++;
-  
-  if (ipData.firstAttemptAt === 0) {
-    ipData.firstAttemptAt = Date.now();
-  }
-  
   ipAttempts.set(ip, ipData);
 }
 

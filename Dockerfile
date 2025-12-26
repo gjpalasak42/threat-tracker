@@ -21,7 +21,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_ENV=development
 EXPOSE 3000
-# Sync schema and start dev server (--force skips interactive prompts)
+# Sync schema and start dev server (--force skips interactive prompts in dev environment;
+# production uses migrations via entrypoint.sh for controlled schema changes)
 CMD ["sh", "-c", "bunx drizzle-kit push --force && bun run dev"]
 
 # ============================================

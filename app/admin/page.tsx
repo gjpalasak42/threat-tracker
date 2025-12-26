@@ -207,10 +207,11 @@ export default function AdminPage() {
     }
     
     if (result.success) {
-      setSuccessMessage(
-        `${source} sync completed: ${result.inserted ?? 0} inserted` +
-        (result.updated !== undefined ? `, ${result.updated} updated` : '')
-      );
+      const inserted = result.inserted ?? 0;
+      const updated = result.updated ?? 0;
+      const messageParts = [`${inserted} inserted`];
+      if (updated > 0) messageParts.push(`${updated} updated`);
+      setSuccessMessage(`${source} sync completed: ${messageParts.join(', ')}`);
       // Refresh threat intel status
       const statusResult = await getThreatIntelStatus();
       if (statusResult.success) {

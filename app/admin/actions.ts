@@ -477,8 +477,10 @@ export async function triggerOTXSync(): Promise<TriggerSyncResult> {
 
             indicatorsInserted++;
           }
-        } catch {
-          // Skip individual indicator errors
+        } catch (indicatorError) {
+          const errorMessage = indicatorError instanceof Error ? indicatorError.message : 'Unknown error';
+          console.error(`Failed to process indicator ${indicator.indicator}:`, errorMessage);
+          errors.push(`${indicator.indicator}: ${errorMessage}`);
         }
       }
     }
