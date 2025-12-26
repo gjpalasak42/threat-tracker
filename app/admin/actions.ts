@@ -473,7 +473,7 @@ export async function triggerOTXSync(): Promise<TriggerSyncResult> {
                 sourcesData: { otx: otxData },
                 metadata: { pulseId: pulse.id, pulseName: pulse.name },
               })
-              .onConflictDoNothing();
+              .onConflictDoNothing({ target: [threatLogs.indicator, threatLogs.source] });
 
             indicatorsInserted++;
           }

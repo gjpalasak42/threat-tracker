@@ -210,7 +210,7 @@ export const threatLogs = pgTable('threat_logs', {
   updatedAt: timestamp('updated_at', { withTimezone: true }),
 }, (table) => [
   // Unique constraint for deduplication: same indicator from same source
-  uniqueIndex('uq_threat_indicator').on(table.indicator),
+  uniqueIndex('uq_threat_logs_indicator_source').on(table.indicator, table.source),
 ]);
 
 // =============================================================================
