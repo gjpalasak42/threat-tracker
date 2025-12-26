@@ -187,7 +187,12 @@ export async function signupAction(
 
   if (!result.success) {
     // Return generic message to prevent user enumeration
-    // The actual error (e.g., "email already exists") is not exposed
+    // The actual error (e.g., "email already exists") is not exposed to the user
+    // Log detailed error server-side for admin troubleshooting
+    console.error('User registration failed', {
+      email: validationResult.data.email,
+      result,
+    });
     return {
       success: false,
       error: 'Registration failed. Please check your information and try again.',
