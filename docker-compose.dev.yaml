@@ -48,6 +48,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-threat_user}:${POSTGRES_PASSWORD:-threat_pass}@db:5432/${POSTGRES_DB:-threat_tracker}
       NODE_ENV: ${NODE_ENV:-development}
       AUTH_SECRET: ${AUTH_SECRET:-dev_secret_change_in_production}
+      CRON_SECRET: ${CRON_SECRET:-dev_cron_secret_change_in_production}
       AUTH_TRUST_HOST: "true"
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
       ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY}
