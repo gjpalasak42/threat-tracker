@@ -6,7 +6,7 @@
  * Route protection:
  * - /admin/*: Requires ADMIN role
  * - /investigate/*: Requires authenticated user (STANDARD_USER+)
- * - /api/sync/*: Requires authenticated user
+ * - /api/sync/*: Uses its own CRON_SECRET token auth (not session-based)
  * - /auth/*: Accessible to all (for login/signup)
  * - /: Public (dashboard snapshot)
  */
@@ -27,7 +27,7 @@ export async function middleware(request: NextRequest) {
   const protectedRoutes = [
     { path: '/admin', requiredRole: 'ADMIN' },
     { path: '/investigate', requiredRole: 'STANDARD_USER' },
-    { path: '/api/sync', requiredRole: 'STANDARD_USER' },
+    // Note: /api/sync is NOT protected here - it uses its own CRON_SECRET token auth
   ];
 
   // Check if current path matches any protected route
@@ -67,6 +67,6 @@ export const config = {
     // Match all protected routes
     '/admin/:path*',
     '/investigate/:path*',
-    '/api/sync/:path*',
+    // Note: /api/sync uses token-based auth, not session-based middleware
   ],
 };
