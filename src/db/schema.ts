@@ -81,6 +81,32 @@ export const verificationTokens = pgTable('verification_tokens', {
 ]);
 
 // =============================================================================
+// Account Lockouts (Rate Limiting & Brute Force Protection)
+// =============================================================================
+
+/**
+ * Account lockouts table for tracking failed login attempts
+ * Used for brute force protection and rate limiting
+ */
+export const accountLockouts = pgTable('account_lockouts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(), // For pre-registration lockouts
+  failedAttempts: integer('failed_attempts').default(0).notNull(),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }).defaultNow().notNull(),
+  lastAttemptIp: text('last_attempt_ip'),
+  unlockedBy: uuid('unlocked_by').references(() => users.id),
+  unlockedAt: timestamp('unlocked_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('uq_lockouts_email').on(table.email),
+]);
+
+// Account lockout types
+export type AccountLockout = typeof accountLockouts.$inferSelect;
+export type NewAccountLockout = typeof accountLockouts.$inferInsert;
+
+// =============================================================================
 // System Configuration (Kill Switches)
 // =============================================================================
 
@@ -101,11 +127,71 @@ export const KILL_SWITCH_KEYS = {
   REGISTRATION_ENABLED: 'registration_enabled',
   EXTERNAL_API_ENABLED: 'external_api_enabled',
   DATABASE_SEARCH_ENABLED: 'database_search_enabled',
+  OTX_SYNC_ENABLED: 'otx_sync_enabled',
+} as const;
+
+// System config key constants (non-boolean settings)
+export const SYSTEM_CONFIG_KEYS = {
+  LAST_OTX_SYNC: 'last_otx_sync',
+  LAST_ABUSEIPDB_SYNC: 'last_abuseipdb_sync',
 } as const;
 
 // =============================================================================
 // Threat Intelligence Tables (Existing)
 // =============================================================================
+
+// =============================================================================
+// Multi-Source Threat Intelligence Types
+// =============================================================================
+
+/**
+ * AbuseIPDB source data structure
+ */
+export interface AbuseIPDBSourceData {
+  confidence: number;
+  reports: number;
+  lastReported: string | null;
+  countryCode?: string;
+  countryName?: string;
+  isp?: string;
+  domain?: string;
+  isTor?: boolean;
+  usageType?: string;
+  isWhitelisted?: boolean | null;
+  fetchedAt: string;
+}
+
+/**
+ * OTX pulse reference
+ */
+export interface OTXPulseReference {
+  id: string;
+  name: string;
+  author: string;
+  tags: string[];
+  created: string;
+}
+
+/**
+ * OTX source data structure
+ */
+export interface OTXSourceData {
+  pulseCount: number;
+  pulses: OTXPulseReference[];
+  references: string[];
+  countryCode?: string;
+  countryName?: string;
+  reputation?: number;
+  fetchedAt: string;
+}
+
+/**
+ * Combined sources data structure
+ */
+export interface SourcesData {
+  abuseipdb?: AbuseIPDBSourceData;
+  otx?: OTXSourceData;
+}
 
 /**
  * Threat logs table for storing threat intelligence indicators
@@ -114,11 +200,14 @@ export const threatLogs = pgTable('threat_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
   indicator: text('indicator').notNull(),
   type: text('type').notNull(), // 'ipv4', 'ipv6', 'domain', 'url', 'hash', etc.
-  severity: integer('severity').notNull(), // 1-100 scale
-  confidenceScore: real('confidence_score').notNull().default(0), // For multi-source deconfliction
-  source: text('source').notNull(), // e.g., 'AbuseIPDB', 'VirusTotal'
-  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}), // Flexible extra data
+  severity: integer('severity').notNull(), // 1-100 scale (primary source score)
+  confidenceScore: real('confidence_score').notNull().default(0), // Normalized 0-1
+  unifiedRiskScore: real('unified_risk_score'), // Deconflicted score from all sources (0-100)
+  source: text('source').notNull(), // Primary source: 'AbuseIPDB', 'OTX', etc.
+  sourcesData: jsonb('sources_data').$type<SourcesData>().default({}), // Multi-source data
+  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}), // Legacy/extra data
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }),
 }, (table) => [
   // Unique constraint for deduplication: same indicator from same source
   uniqueIndex('uq_threat_logs_indicator_source').on(table.indicator, table.source),
@@ -142,3 +231,28 @@ export type NewSystemConfig = typeof systemConfig.$inferInsert;
 // Threat log types
 export type ThreatLog = typeof threatLogs.$inferSelect;
 export type NewThreatLog = typeof threatLogs.$inferInsert;
+
+// =============================================================================
+// API Audit Logging
+// =============================================================================
+
+/**
+ * API audit logs table for tracking external API calls
+ * Used for rate limiting, debugging, and security auditing
+ */
+export const apiAuditLogs = pgTable('api_audit_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id),
+  apiSource: text('api_source').notNull(), // 'AbuseIPDB', 'OTX'
+  endpoint: text('endpoint').notNull(), // e.g., '/check', '/pulses/subscribed'
+  indicator: text('indicator'), // The indicator looked up (if applicable)
+  responseCode: integer('response_code'), // HTTP status code
+  responseTime: integer('response_time'), // Response time in ms
+  success: boolean('success').notNull(),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// API audit log types
+export type ApiAuditLog = typeof apiAuditLogs.$inferSelect;
+export type NewApiAuditLog = typeof apiAuditLogs.$inferInsert;

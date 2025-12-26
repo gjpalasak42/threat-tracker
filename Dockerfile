@@ -21,9 +21,21 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_ENV=development
 EXPOSE 3000
-# Sync schema and start dev server (runs without --force to avoid unintended data loss;
-# add --force manually if you explicitly accept potentially destructive schema changes)
-CMD ["sh", "-c", "bunx drizzle-kit push && bun run dev"]
+# Sync schema and start dev server (--force skips interactive prompts in dev environment;
+# production uses migrations via entrypoint.sh for controlled schema changes)
+CMD ["sh", "-c", "bunx drizzle-kit push --force && bun run dev"]
+
+# ============================================
+# Migration stage (for running DB migrations)
+# ============================================
+FROM base AS migrate
+COPY --from=deps /app/node_modules ./node_modules
+COPY drizzle.config.ts ./
+COPY drizzle ./drizzle
+COPY src/db ./src/db
+ENV NODE_ENV=production
+# Run migrations and exit
+CMD ["bunx", "drizzle-kit", "migrate"]
 
 # ============================================
 # Builder stage (production build)
@@ -33,7 +45,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN bun run build
+# Build app and compile migration script
+RUN bun run build && \
+    bun build scripts/migrate.ts --outfile scripts/migrate.js --target bun
 
 # ============================================
 # Production runner stage
@@ -54,6 +68,11 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy migration files for startup migrations
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.js ./scripts/migrate.js
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/entrypoint.sh ./scripts/entrypoint.sh
+
 # Switch to non-root user
 USER nextjs
 
@@ -66,4 +85,5 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD bun -e "fetch('http://localhost:3000/api/health').then(r => process.exit(r.status === 200 ? 0 : 1)).catch(() => process.exit(1))"
 
-CMD ["bun", "run", "server.js"]
+# Run migrations at startup, then start app
+CMD ["sh", "./scripts/entrypoint.sh"]

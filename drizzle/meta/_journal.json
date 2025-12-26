@@ -8,6 +8,20 @@
       "when": 1766175617099,
       "tag": "0000_ancient_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1766379049037,
+      "tag": "0001_oval_naoko",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1766776136403,
+      "tag": "0002_crazy_morg",
+      "breakpoints": true
     }
   ]
 }

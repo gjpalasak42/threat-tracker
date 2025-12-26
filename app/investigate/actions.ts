@@ -11,8 +11,18 @@
  */
 
 import { checkIp } from '@/src/lib/abuseipdb';
+import { getIndicatorGeneral } from '@/src/lib/otx';
+import { calculateUnifiedRisk, type UnifiedRiskResult } from '@/src/lib/deconfliction';
+import { withAuditLog } from '@/src/lib/audit-logger';
 import { db } from '@/src/db/db';
-import { threatLogs, type ThreatLog, KILL_SWITCH_KEYS } from '@/src/db/schema';
+import { 
+  threatLogs, 
+  type ThreatLog, 
+  type SourcesData,
+  type AbuseIPDBSourceData,
+  type OTXSourceData,
+  KILL_SWITCH_KEYS 
+} from '@/src/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { isIP } from 'net';
 import { 
@@ -23,6 +33,7 @@ import {
 } from '@/src/lib/auth-guards';
 
 const THREAT_SOURCE_ABUSEIPDB = 'AbuseIPDB';
+const THREAT_SOURCE_OTX = 'OTX';
 
 /**
  * Check if the current user has API access (API_USER or ADMIN)
@@ -56,6 +67,9 @@ export interface InvestigateResult {
     isWhitelisted: boolean | null;
     usageType: string;
   };
+  // Multi-source data
+  sourcesData?: SourcesData;
+  unifiedRisk?: UnifiedRiskResult;
   error?: string;
   code?: number;
   rateLimit?: {
@@ -287,3 +301,230 @@ export async function investigateIp(
     };
   }
 }
+
+/**
+ * Investigate an IP address using multiple sources (AbuseIPDB + OTX)
+ * 
+ * SECURITY:
+ * - Requires API_USER or higher for external API calls
+ * - Respects kill switches for each source
+ * 
+ * @param ipAddress - The IP address to investigate
+ * @param userId - Optional user ID for audit logging
+ */
+export async function investigateIpMultiSource(
+  ipAddress: string,
+  userId?: string
+): Promise<InvestigateResult> {
+  // Require API_USER for multi-source lookups
+  const authResult = await requireRole('API_USER');
+  if ('error' in authResult) {
+    return {
+      success: false,
+      fromCache: false,
+      error: authResult.error,
+      code: authResult.code,
+    };
+  }
+
+  // Check kill switch for external APIs
+  const killSwitchResult = await requireRoleAndFeature('API_USER', KILL_SWITCH_KEYS.EXTERNAL_API_ENABLED);
+  if ('error' in killSwitchResult) {
+    return {
+      success: false,
+      fromCache: false,
+      error: 'External API queries are currently disabled',
+      code: 503,
+    };
+  }
+
+  // Validate IP address
+  if (!ipAddress || typeof ipAddress !== 'string') {
+    return {
+      success: false,
+      fromCache: false,
+      error: 'Please enter an IP address',
+    };
+  }
+
+  const trimmedIp = ipAddress.trim();
+  const ipVersion = isIP(trimmedIp);
+
+  if (ipVersion === 0) {
+    return {
+      success: false,
+      fromCache: false,
+      error: 'Invalid IP address format',
+    };
+  }
+
+  const effectiveUserId = userId || authResult.session.user.id;
+  const sourcesData: SourcesData = {};
+  let abuseData: Awaited<ReturnType<typeof checkIp>>['data'] | null = null;
+
+  // Fetch from AbuseIPDB
+  try {
+    const result = await withAuditLog(
+      'AbuseIPDB',
+      '/check',
+      trimmedIp,
+      effectiveUserId,
+      () => checkIp(trimmedIp)
+    );
+    abuseData = result.data;
+
+    const abuseSourceData: AbuseIPDBSourceData = {
+      confidence: result.data.abuseConfidenceScore,
+      reports: result.data.totalReports,
+      lastReported: result.data.lastReportedAt,
+      countryCode: result.data.countryCode,
+      countryName: result.data.countryName,
+      isp: result.data.isp,
+      domain: result.data.domain,
+      isTor: result.data.isTor,
+      usageType: result.data.usageType,
+      isWhitelisted: result.data.isWhitelisted,
+      fetchedAt: new Date().toISOString(),
+    };
+    sourcesData.abuseipdb = abuseSourceData;
+  } catch (error) {
+    console.error('AbuseIPDB lookup failed:', error);
+    // Continue with OTX lookup even if AbuseIPDB fails
+  }
+
+  // Fetch from OTX
+  try {
+    const otxType = ipVersion === 4 ? 'IPv4' : 'IPv6';
+    const result = await withAuditLog(
+      'OTX',
+      '/indicators/general',
+      trimmedIp,
+      effectiveUserId,
+      () => getIndicatorGeneral(otxType, trimmedIp)
+    );
+
+    const otxSourceData: OTXSourceData = {
+      pulseCount: result.data.pulse_info?.count || 0,
+      pulses: (result.data.pulse_info?.pulses || []).slice(0, 10).map(p => ({
+        id: p.id,
+        name: p.name,
+        author: p.author_name,
+        tags: p.tags,
+        created: p.created,
+      })),
+      references: result.data.pulse_info?.references || [],
+      countryCode: result.data.country_code,
+      countryName: result.data.country_name,
+      reputation: result.data.reputation,
+      fetchedAt: new Date().toISOString(),
+    };
+    sourcesData.otx = otxSourceData;
+  } catch (error) {
+    console.error('OTX lookup failed:', error);
+    // Continue even if OTX fails
+  }
+
+  // Calculate unified risk score
+  const unifiedRisk = calculateUnifiedRisk({
+    abuseScore: sourcesData.abuseipdb?.confidence,
+    otxPulseCount: sourcesData.otx?.pulseCount,
+  });
+
+  // Store/update in database
+  try {
+    const ipType = ipVersion === 4 ? 'ipv4' : 'ipv6';
+    const severity = abuseData?.abuseConfidenceScore || unifiedRisk.score;
+
+    await db.insert(threatLogs)
+      .values({
+        indicator: trimmedIp,
+        type: ipType,
+        severity,
+        confidenceScore: severity / 100,
+        unifiedRiskScore: unifiedRisk.score,
+        source: abuseData ? THREAT_SOURCE_ABUSEIPDB : THREAT_SOURCE_OTX,
+        sourcesData,
+        metadata: abuseData ? {
+          countryCode: abuseData.countryCode,
+          countryName: abuseData.countryName,
+          isp: abuseData.isp,
+          domain: abuseData.domain,
+          isTor: abuseData.isTor,
+          usageType: abuseData.usageType,
+          totalReports: abuseData.totalReports,
+          lastReportedAt: abuseData.lastReportedAt,
+          isWhitelisted: abuseData.isWhitelisted,
+          importedAt: new Date().toISOString(),
+        } : {},
+      })
+      .onConflictDoUpdate({
+        target: [threatLogs.indicator, threatLogs.source],
+        set: {
+          severity,
+          confidenceScore: severity / 100,
+          unifiedRiskScore: unifiedRisk.score,
+          sourcesData,
+          updatedAt: new Date(),
+        },
+      });
+  } catch (dbError) {
+    console.error('Failed to store multi-source data:', dbError);
+  }
+
+  // Build response
+  const responseData = abuseData ? {
+    ipAddress: abuseData.ipAddress,
+    abuseConfidenceScore: abuseData.abuseConfidenceScore,
+    countryCode: abuseData.countryCode,
+    countryName: abuseData.countryName,
+    isp: abuseData.isp,
+    domain: abuseData.domain,
+    isTor: abuseData.isTor,
+    totalReports: abuseData.totalReports,
+    lastReportedAt: abuseData.lastReportedAt,
+    isWhitelisted: abuseData.isWhitelisted,
+    usageType: abuseData.usageType,
+  } : {
+    ipAddress: trimmedIp,
+    abuseConfidenceScore: 0,
+    countryCode: sourcesData.otx?.countryCode || 'Unknown',
+    countryName: sourcesData.otx?.countryName || 'Unknown',
+    isp: '',
+    domain: '',
+    isTor: false,
+    totalReports: 0,
+    lastReportedAt: null,
+    isWhitelisted: null,
+    usageType: '',
+  };
+
+  return {
+    success: true,
+    fromCache: false,
+    data: responseData,
+    sourcesData,
+    unifiedRisk,
+  };
+}
+
+/**
+ * Get OTX data for an indicator from the database
+ */
+export async function getOtxDataFromCache(
+  indicator: string
+): Promise<OTXSourceData | null> {
+  try {
+    const result = await db.select({ sourcesData: threatLogs.sourcesData })
+      .from(threatLogs)
+      .where(eq(threatLogs.indicator, indicator))
+      .limit(1);
+
+    if (result.length > 0 && result[0].sourcesData) {
+      return (result[0].sourcesData as SourcesData).otx || null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+

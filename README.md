@@ -7,15 +7,17 @@ A modern threat intelligence tracking application built with Next.js, TypeScript
 ### ✅ Implemented Features
 
 - 🔒 **OSINT Investigation Hub**: Complete security operations dashboard
-- 🔍 **IP Investigation**: Manual lookup against AbuseIPDB with detailed reports
+- 🔍 **IP Investigation**: Manual lookup against AbuseIPDB and AlienVault OTX with detailed reports
+- 🌐 **Multi-Source Intelligence**: Integration with AbuseIPDB and AlienVault OTX for comprehensive threat data
+- 🎯 **Deconflicted Risk Scoring**: Unified risk scores combining data from multiple sources
 - 📡 **Intelligence Pulse**: Real-time threat feed with SSE streaming
 - 📊 **Severity Scoring**: 1-100 scale severity ratings for threat assessment
-- 🎯 **Confidence Scoring**: Multi-source deconfliction with confidence metrics
-- ⏰ **Automated Sync**: Background ingestion from AbuseIPDB blacklist (2x/day)
+- ⏰ **Automated Sync**: Background ingestion from AbuseIPDB (2x/day) and OTX (every 4 hours)
 - 🗄️ **PostgreSQL Database**: Robust data persistence with Drizzle ORM
 - 🐳 **Docker Support**: Easy deployment with Docker Compose
 - ⚡ **Modern Stack**: Built with Next.js 16, React 19, and TypeScript
 - 🔐 **User Authentication**: Email/password authentication with session management
+- 📝 **API Audit Logging**: Track all external API calls for security and debugging
 
 ### 🚧 Future Improvements
 
@@ -24,23 +26,26 @@ A modern threat intelligence tracking application built with Next.js, TypeScript
   - Rate limiting on the login endpoint
   - Account lockout after multiple failed attempts
   - Redis integration to track and limit authentication attempts per IP address or email
-- � **User Enumeration Protection**: Registration currently reveals if an email exists. Future implementation will use a generic error message and email-based verification flow to prevent account enumeration attacks.
+-  **User Enumeration Protection**: Registration currently reveals if an email exists. Future implementation will use a generic error message and email-based verification flow to prevent account enumeration attacks.
 - 📊 **SIEM Integration**: Security logs (unauthorized access attempts, etc.) should be sent to a proper security monitoring service in production rather than console.warn. Consider integrating with a SIEM or structured logging service.
 - 🔑 **Enhanced Password Policy**: Add special character requirements to the password validation (currently requires uppercase, lowercase, and number only).
 - ⚙️ **Configurable Bcrypt Rounds**: Make the bcrypt cost factor configurable via environment variable to allow adjusting as computing power increases.
 
 #### Feature Enhancements
-- �🔗 **Multi-Source Intelligence**: Integration with additional threat intelligence providers (VirusTotal, OTX, etc.)
+- 🔗 **Multi-Source Intelligence**: Integration with additional threat intelligence providers (VirusTotal, OTX, etc.)
 - 📈 **Analytics Dashboard**: Historical trend analysis and visualization of threat patterns
 - 🔔 **Alert Notifications**: Configurable alerts for high-severity threats via email/Slack
 - 🌍 **Geolocation Mapping**: Visual mapping of threat origins
 - 📝 **Threat Notes & Tagging**: User annotations and custom tagging for indicators
 - 🔄 **API Export**: RESTful API for external integrations and data export
+- 🦠 **VirusTotal Integration**: Additional threat intelligence source for file hashes and URLs
 
 #### Code Quality & UX
 - 🔄 **Optimistic Updates with Rollback**: Admin page state updates should handle failures gracefully by refetching data or implementing proper rollback capabilities.
 - ♿ **Accessibility Improvements**: Replace Unicode loading spinners with accessible indicators using proper ARIA attributes and screen reader support.
 - 🧪 **Test Coverage**: Add comprehensive tests for authentication server actions and admin operations (role changes, user activation, kill switch management).
+- 🔍 **Intelligence Pulse Filtering & Sorting**: Add search, filtering by source/severity/type, and sorting capabilities to the Intelligence Pulse page for better data navigation.
+- 📊 **Pagination**: Implement pagination for the Intelligence Pulse page to handle large datasets efficiently.
 
 ## Tech Stack
 
@@ -59,6 +64,7 @@ A modern threat intelligence tracking application built with Next.js, TypeScript
 - Docker and Docker Compose (for containerized deployment)
 - PostgreSQL 16 (if running locally without Docker)
 - AbuseIPDB API Key (free tier available at https://www.abuseipdb.com/)
+- AlienVault OTX API Key (free at https://otx.alienvault.com/api)
 
 ### Installation
 
@@ -236,8 +242,9 @@ POSTGRES_DB=threat_tracker
 DATABASE_URL=postgres://threat_user:threat_pass@localhost:5432/threat_tracker
 NODE_ENV=development
 
-# AbuseIPDB API
-ABUSEIPDB_API_KEY=your_api_key_here
+# Threat Intelligence APIs
+ABUSEIPDB_API_KEY=your_abuseipdb_api_key_here
+OTX_API_KEY=your_otx_api_key_here
 
 # Cron Job Authentication
 CRON_SECRET=your_secure_random_string
