@@ -217,6 +217,8 @@ export default function AdminPage() {
       if (statusResult.success) {
         setThreatIntelSources(statusResult.sources);
       }
+      // Notify sidebar to update
+      window.dispatchEvent(new CustomEvent('threat-tracker:sync-complete'));
     } else {
       setError(result.error || `${source} sync failed`);
     }

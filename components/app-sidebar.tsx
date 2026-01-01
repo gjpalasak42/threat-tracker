@@ -51,7 +51,17 @@ export function AppSidebar() {
       getSyncStatus().then(setSyncStatus);
     }, 60 * 1000);
     
-    return () => clearInterval(interval);
+    // Listen for manual sync events to update immediately
+    const handleSyncComplete = () => {
+      getSyncStatus().then(setSyncStatus);
+    };
+    
+    window.addEventListener('threat-tracker:sync-complete', handleSyncComplete);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('threat-tracker:sync-complete', handleSyncComplete);
+    };
   }, []);
 
   return (

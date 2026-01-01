@@ -6,6 +6,8 @@ function formatRelativeTime(dateStr: string | null): string {
   if (!dateStr) return 'Never';
   
   const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return 'Invalid date';
+  
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / (1000 * 60));
@@ -24,16 +26,16 @@ export function RelativeTime({ date }: { date: string | null }) {
   const [, setTick] = useState(0);
 
   useEffect(() => {
-    // Determine update frequency
-    // If > 24 hours (showing days), no need to auto-update
-    // If < 24 hours, update every minute to capture minute/hour changes
     if (!date) return;
     
     const d = new Date(date);
+    if (isNaN(d.getTime())) return;
+
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
     const oneDayMs = 24 * 60 * 60 * 1000;
     
+    // If > 24 hours, no need to auto-update
     if (diffMs > oneDayMs) return;
 
     const interval = setInterval(() => {
