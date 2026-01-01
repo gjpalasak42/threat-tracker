@@ -21,19 +21,15 @@ function formatRelativeTime(dateStr: string | null): string {
 }
 
 export function RelativeTime({ date }: { date: string | null }) {
-  const [timeString, setTimeString] = useState(() => formatRelativeTime(date));
+  const [, setTick] = useState(0);
 
   useEffect(() => {
-    // Initial update
-    setTimeString(formatRelativeTime(date));
-
-    // Update every minute to keep "X ago" fresh
     const interval = setInterval(() => {
-      setTimeString(formatRelativeTime(date));
+      setTick((t) => t + 1);
     }, 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [date]);
+  }, []);
 
-  return <span>{timeString}</span>;
+  return <span>{formatRelativeTime(date)}</span>;
 }
