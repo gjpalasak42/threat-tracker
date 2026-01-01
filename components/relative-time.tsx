@@ -24,12 +24,24 @@ export function RelativeTime({ date }: { date: string | null }) {
   const [, setTick] = useState(0);
 
   useEffect(() => {
+    // Determine update frequency
+    // If > 24 hours (showing days), no need to auto-update
+    // If < 24 hours, update every minute to capture minute/hour changes
+    if (!date) return;
+    
+    const d = new Date(date);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    
+    if (diffMs > oneDayMs) return;
+
     const interval = setInterval(() => {
       setTick((t) => t + 1);
     }, 60 * 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [date]);
 
   return <span>{formatRelativeTime(date)}</span>;
 }

@@ -46,10 +46,10 @@ export function AppSidebar() {
   useEffect(() => {
     getSyncStatus().then(setSyncStatus);
     
-    // Check for status updates (changed/enabled state) every 30 seconds
+    // Check for status updates (changed/enabled state) every 60 seconds
     const interval = setInterval(() => {
       getSyncStatus().then(setSyncStatus);
-    }, 30 * 1000);
+    }, 60 * 1000);
     
     return () => clearInterval(interval);
   }, []);
