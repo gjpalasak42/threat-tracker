@@ -19,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { LayoutDashboard, Search, Activity, Shield, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { getSyncStatus, type SyncStatus } from '@/app/dashboard-actions';
+import { RelativeTime } from '@/components/relative-time';
 
 const navItems = [
   {
@@ -38,24 +39,6 @@ const navItems = [
   },
 ];
 
-function formatRelativeTime(dateStr: string | null): string {
-  if (!dateStr) return 'Never';
-  
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 export function AppSidebar() {
   const pathname = usePathname();
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
@@ -63,12 +46,22 @@ export function AppSidebar() {
   useEffect(() => {
     getSyncStatus().then(setSyncStatus);
     
-    // Refresh every 5 minutes
+    // Check for status updates (changed/enabled state) every 60 seconds
     const interval = setInterval(() => {
       getSyncStatus().then(setSyncStatus);
-    }, 5 * 60 * 1000);
+    }, 60 * 1000);
     
-    return () => clearInterval(interval);
+    // Listen for manual sync events to update immediately
+    const handleSyncComplete = () => {
+      getSyncStatus().then(setSyncStatus);
+    };
+    
+    window.addEventListener('threat-tracker:sync-complete', handleSyncComplete);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('threat-tracker:sync-complete', handleSyncComplete);
+    };
   }, []);
 
   return (
@@ -129,7 +122,7 @@ export function AppSidebar() {
                 {syncStatus?.abuseipdb.lastSync && (
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                     <Clock className="h-2 w-2 mr-1" />
-                    {formatRelativeTime(syncStatus.abuseipdb.lastSync)}
+                    <RelativeTime date={syncStatus.abuseipdb.lastSync} />
                   </Badge>
                 )}
               </div>
@@ -147,7 +140,7 @@ export function AppSidebar() {
                 {syncStatus?.otx.enabled && syncStatus?.otx.lastSync && (
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                     <Clock className="h-2 w-2 mr-1" />
-                    {formatRelativeTime(syncStatus.otx.lastSync)}
+                    <RelativeTime date={syncStatus.otx.lastSync} />
                   </Badge>
                 )}
                 {syncStatus?.otx.enabled && !syncStatus?.otx.lastSync && (
