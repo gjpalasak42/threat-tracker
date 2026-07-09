@@ -54,7 +54,8 @@ services:
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
       ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY}
       OTX_API_KEY: ${OTX_API_KEY}
-      CRON_SECRET: ${CRON_SECRET}
+      THREAT_INGESTION_SECRET: ${THREAT_INGESTION_SECRET}
+      CRON_SECRET: ${CRON_SECRET:?CRON_SECRET environment variable must be set for scheduled sync in production}
       NEXT_PUBLIC_DISABLE_DEVTOOLS: "true"
     depends_on:
       db:

@@ -69,6 +69,12 @@ export async function POST(request: NextRequest) {
   };
 
   try {
+    const lastSyncResult = await db.select({ lastSync: systemConfig.updatedAt })
+      .from(systemConfig)
+      .where(eq(systemConfig.key, SYSTEM_CONFIG_KEYS.LAST_OTX_SYNC))
+      .limit(1);
+    const modifiedSince = lastSyncResult[0]?.lastSync?.toISOString();
+
     // Fetch subscribed pulses with pagination
     let page = 1;
     let hasMore = true;
@@ -76,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     while (hasMore && page <= MAX_PAGES) {
       try {
-        const { data } = await getSubscribedPulses(page, PULSES_PER_PAGE);
+        const { data } = await getSubscribedPulses(page, PULSES_PER_PAGE, modifiedSince);
         allPulses.push(...data.results);
         
         // Log API call
@@ -93,6 +99,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         result.errors.push(`Page ${page}: ${errorMessage}`);
+        result.success = false;
         
         await logApiCall({
           apiSource: 'OTX',
@@ -182,7 +189,7 @@ export async function POST(request: NextRequest) {
               otxPulseCount: 1,
             });
 
-            await db.insert(threatLogs)
+            const insertResult = await db.insert(threatLogs)
               .values({
                 indicator: indicator.indicator,
                 type: internalType,
@@ -197,36 +204,40 @@ export async function POST(request: NextRequest) {
                   importedAt: new Date().toISOString(),
                 },
               })
-              .onConflictDoNothing({ target: [threatLogs.indicator, threatLogs.source] });
+              .onConflictDoNothing({ target: [threatLogs.indicator, threatLogs.source] })
+              .returning({ id: threatLogs.id });
 
-            result.indicatorsInserted++;
+            result.indicatorsInserted += insertResult.length;
           }
         } catch (dbError) {
           const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
           result.errors.push(`Indicator ${indicator.indicator}: ${errorMessage}`);
+          result.success = false;
         }
       }
     }
 
-    // Update last sync timestamp in system_config
-    await db.insert(systemConfig)
-      .values({
-        key: SYSTEM_CONFIG_KEYS.LAST_OTX_SYNC,
-        value: true, // Using value field, actual timestamp is in updatedAt
-        description: 'Last successful OTX sync timestamp',
-      })
-      .onConflictDoUpdate({
-        target: systemConfig.key,
-        set: {
-          updatedAt: new Date(),
-        },
-      });
+    if (result.success) {
+      await db.insert(systemConfig)
+        .values({
+          key: SYSTEM_CONFIG_KEYS.LAST_OTX_SYNC,
+          value: true, // Using value field, actual timestamp is in updatedAt
+          description: 'Last successful OTX sync timestamp',
+        })
+        .onConflictDoUpdate({
+          target: systemConfig.key,
+          set: {
+            updatedAt: new Date(),
+          },
+        });
+    }
 
     return NextResponse.json({
       ...result,
+      modifiedSince,
       syncedAt: new Date().toISOString(),
       durationMs: Date.now() - startTime,
-    });
+    }, { status: result.success ? 200 : 502 });
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

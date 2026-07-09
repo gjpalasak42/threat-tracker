@@ -483,7 +483,7 @@ export async function triggerOTXSync(): Promise<TriggerSyncResult> {
           } else {
             const unifiedRisk = calculateUnifiedRisk({ otxPulseCount: 1 });
 
-            await db.insert(threatLogs)
+            const insertResult = await db.insert(threatLogs)
               .values({
                 indicator: indicator.indicator,
                 type: internalType,
@@ -494,9 +494,10 @@ export async function triggerOTXSync(): Promise<TriggerSyncResult> {
                 sourcesData: { otx: otxData },
                 metadata: { pulseId: pulse.id, pulseName: pulse.name },
               })
-              .onConflictDoNothing({ target: [threatLogs.indicator, threatLogs.source] });
+              .onConflictDoNothing({ target: [threatLogs.indicator, threatLogs.source] })
+              .returning({ id: threatLogs.id });
 
-            indicatorsInserted++;
+            indicatorsInserted += insertResult.length;
           }
         } catch (indicatorError) {
           const errorMessage = indicatorError instanceof Error ? indicatorError.message : 'Unknown error';
@@ -506,21 +507,22 @@ export async function triggerOTXSync(): Promise<TriggerSyncResult> {
       }
     }
 
-    // Update last sync timestamp
-    await db.insert(systemConfig)
-      .values({
-        key: SYSTEM_CONFIG_KEYS.LAST_OTX_SYNC,
-        value: true,
-        description: 'Last OTX sync timestamp',
-        updatedBy: authResult.session.user.id,
-      })
-      .onConflictDoUpdate({
-        target: systemConfig.key,
-        set: { updatedAt: new Date(), updatedBy: authResult.session.user.id },
-      });
+    if (errors.length === 0) {
+      await db.insert(systemConfig)
+        .values({
+          key: SYSTEM_CONFIG_KEYS.LAST_OTX_SYNC,
+          value: true,
+          description: 'Last OTX sync timestamp',
+          updatedBy: authResult.session.user.id,
+        })
+        .onConflictDoUpdate({
+          target: systemConfig.key,
+          set: { updatedAt: new Date(), updatedBy: authResult.session.user.id },
+        });
+    }
 
     return {
-      success: true,
+      success: errors.length === 0,
       source: 'OTX',
       processed: indicatorsProcessed,
       inserted: indicatorsInserted,

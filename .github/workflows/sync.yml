@@ -26,6 +26,7 @@ on:
 
 env:
   APP_URL: ${{ secrets.APP_URL }}
+  CRON_SECRET: ${{ secrets.CRON_SECRET }}
 
 jobs:
   sync-abuseipdb:
@@ -39,11 +40,19 @@ jobs:
     steps:
       - name: Trigger AbuseIPDB Sync Endpoint
         run: |
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "APP_URL and CRON_SECRET secrets must be configured"
+            exit 1
+          fi
+
           echo "Starting AbuseIPDB sync..."
           
-          response=$(curl -s -w "\n%{http_code}" \
+          response=$(curl -sS -w "\n%{http_code}" \
+            --connect-timeout 15 \
+            --max-time 180 \
+            --retry 2 \
             -X POST \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \
             "${APP_URL}/api/sync")
           
@@ -52,6 +61,11 @@ jobs:
           
           echo "HTTP Status: $http_code"
           echo "Response: $body"
+
+          if [ "$http_code" = "429" ]; then
+            echo "AbuseIPDB sync skipped because a successful sync is still inside the 12-hour window"
+            exit 0
+          fi
           
           if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
             echo "AbuseIPDB sync failed with status $http_code"
@@ -71,11 +85,19 @@ jobs:
     steps:
       - name: Trigger OTX Sync Endpoint
         run: |
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "APP_URL and CRON_SECRET secrets must be configured"
+            exit 1
+          fi
+
           echo "Starting AlienVault OTX sync..."
           
-          response=$(curl -s -w "\n%{http_code}" \
+          response=$(curl -sS -w "\n%{http_code}" \
+            --connect-timeout 15 \
+            --max-time 180 \
+            --retry 2 \
             -X POST \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \
             "${APP_URL}/api/sync/otx")
           
