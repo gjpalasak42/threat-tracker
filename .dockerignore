@@ -18,6 +18,8 @@ out
 # Build
 build
 dist
+data
+*.tsbuildinfo
 
 # Environment files
 .env

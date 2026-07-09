@@ -5,6 +5,7 @@ import { getSubscribedPulses, mapOTXTypeToInternal, type OTXPulseWithIndicators 
 import { calculateUnifiedRisk } from '@/src/lib/deconfliction';
 import { logApiCall } from '@/src/lib/audit-logger';
 import { eq, and } from 'drizzle-orm';
+import { isConfiguredApiKey } from '@/src/lib/sync-status';
 
 /**
  * OTX Sync Endpoint for Cron Job
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Check if OTX API key is configured
-  if (!process.env.OTX_API_KEY) {
+  if (!isConfiguredApiKey(process.env.OTX_API_KEY)) {
     return NextResponse.json(
       { error: 'OTX_API_KEY not configured' },
       { status: 500 }

@@ -14,12 +14,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Shield, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { getSafeInternalPath } from '@/src/lib/validations/auth';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const justRegistered = searchParams.get('registered') === 'true';
+  const requestedCallbackUrl = searchParams.get('callbackUrl');
   
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +34,8 @@ function LoginForm() {
       const result = await loginAction(formData);
 
       if (result.success && result.redirectTo) {
-        router.push(result.redirectTo);
+        const safeCallbackUrl = getSafeInternalPath(requestedCallbackUrl, result.redirectTo);
+        router.push(safeCallbackUrl);
         router.refresh();
       } else if (result.error) {
         setError(result.error);
@@ -107,7 +110,7 @@ function LoginForm() {
           >
             {isLoading ? (
               <>
-                <span className="animate-spin mr-2">⟳</span>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                 Signing in...
               </>
             ) : (

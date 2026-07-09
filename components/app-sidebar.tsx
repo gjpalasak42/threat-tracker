@@ -17,9 +17,10 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar';
 import { Badge } from '@/components/ui/badge';
-import { LayoutDashboard, Search, Activity, Shield, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { LayoutDashboard, Search, Activity, Shield, CheckCircle2, XCircle, Clock, AlertTriangle, CircleDashed } from 'lucide-react';
 import { getSyncStatus, type SyncStatus } from '@/app/dashboard-actions';
 import { RelativeTime } from '@/components/relative-time';
+import { getFeedHealth } from '@/src/lib/sync-status';
 
 const navItems = [
   {
@@ -38,6 +39,57 @@ const navItems = [
     icon: Activity,
   },
 ];
+
+const FEED_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+
+function SourceStatus({
+  label,
+  enabled,
+  lastSync,
+}: {
+  label: string;
+  enabled: boolean;
+  lastSync: string | null;
+}) {
+  const health = getFeedHealth(
+    enabled,
+    lastSync ? new Date(lastSync) : null,
+    new Date(),
+    FEED_STALE_AFTER_MS
+  );
+
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <div className="flex min-w-0 items-center gap-1.5">
+        {health === 'healthy' && <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-500" />}
+        {health === 'stale' && <AlertTriangle className="h-3 w-3 shrink-0 text-amber-400" />}
+        {health === 'never_synced' && <CircleDashed className="h-3 w-3 shrink-0 text-sky-400" />}
+        {health === 'not_configured' && <XCircle className="h-3 w-3 shrink-0 text-muted-foreground" />}
+        <span className="truncate text-muted-foreground">{label}</span>
+      </div>
+
+      {health === 'not_configured' && (
+        <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] text-muted-foreground">
+          Not configured
+        </Badge>
+      )}
+      {health === 'never_synced' && (
+        <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
+          Pending
+        </Badge>
+      )}
+      {(health === 'healthy' || health === 'stale') && lastSync && (
+        <Badge
+          variant="outline"
+          className={`shrink-0 px-1.5 py-0 text-[10px] ${health === 'stale' ? 'border-amber-400/30 text-amber-400' : ''}`}
+        >
+          <Clock className="mr-1 h-2 w-2" />
+          <RelativeTime date={lastSync} />
+        </Badge>
+      )}
+    </div>
+  );
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -109,51 +161,16 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-xs">System Health</SidebarGroupLabel>
           <SidebarGroupContent>
             <div className="space-y-2 px-2 py-1">
-              {/* AbuseIPDB Status */}
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5">
-                  {syncStatus?.abuseipdb.enabled ? (
-                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                  ) : (
-                    <XCircle className="h-3 w-3 text-muted-foreground" />
-                  )}
-                  <span className="text-muted-foreground">AbuseIPDB</span>
-                </div>
-                {syncStatus?.abuseipdb.lastSync && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                    <Clock className="h-2 w-2 mr-1" />
-                    <RelativeTime date={syncStatus.abuseipdb.lastSync} />
-                  </Badge>
-                )}
-              </div>
-              
-              {/* OTX Status */}
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5">
-                  {syncStatus?.otx.enabled ? (
-                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                  ) : (
-                    <XCircle className="h-3 w-3 text-muted-foreground" />
-                  )}
-                  <span className="text-muted-foreground">AlienVault OTX</span>
-                </div>
-                {syncStatus?.otx.enabled && syncStatus?.otx.lastSync && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                    <Clock className="h-2 w-2 mr-1" />
-                    <RelativeTime date={syncStatus.otx.lastSync} />
-                  </Badge>
-                )}
-                {syncStatus?.otx.enabled && !syncStatus?.otx.lastSync && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                    Pending
-                  </Badge>
-                )}
-                {!syncStatus?.otx.enabled && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 text-muted-foreground">
-                    Not configured
-                  </Badge>
-                )}
-              </div>
+              <SourceStatus
+                label="AbuseIPDB"
+                enabled={syncStatus?.abuseipdb.enabled ?? false}
+                lastSync={syncStatus?.abuseipdb.lastSync ?? null}
+              />
+              <SourceStatus
+                label="AlienVault OTX"
+                enabled={syncStatus?.otx.enabled ?? false}
+                lastSync={syncStatus?.otx.lastSync ?? null}
+              />
             </div>
           </SidebarGroupContent>
         </SidebarGroup>

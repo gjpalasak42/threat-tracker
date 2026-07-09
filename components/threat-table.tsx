@@ -52,7 +52,7 @@ export function ThreatTable({ threats, showFlash = false, flashIds = new Set() }
           <TableHead>Type</TableHead>
           <TableHead>Severity</TableHead>
           <TableHead>Source</TableHead>
-          <TableHead>Created</TableHead>
+          <TableHead className="hidden sm:table-cell">Created</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -77,8 +77,10 @@ export function ThreatTable({ threats, showFlash = false, flashIds = new Set() }
               </Badge>
             </TableCell>
             <TableCell className="text-muted-foreground">{threat.source}</TableCell>
-            <TableCell className="text-muted-foreground">
-              {formatDate(threat.createdAt)}
+            <TableCell className="hidden text-muted-foreground sm:table-cell">
+              <time dateTime={new Date(threat.createdAt).toISOString()}>
+                {formatDate(threat.createdAt)}
+              </time>
             </TableCell>
           </TableRow>
         ))}

@@ -10,12 +10,13 @@
 import { db } from '@/src/db/db';
 import { users, systemConfig, threatLogs, KILL_SWITCH_KEYS, type UserRole, SYSTEM_CONFIG_KEYS } from '@/src/db/schema';
 import { requireRole } from '@/src/lib/auth-guards';
-import { eq, desc, max, count } from 'drizzle-orm';
+import { count, eq, desc, max, or, sql } from 'drizzle-orm';
 import { ingestFromAbuseIPDB } from '@/app/threats/actions';
 import { getSubscribedPulses, mapOTXTypeToInternal, type OTXPulseWithIndicators } from '@/src/lib/otx';
 import { calculateUnifiedRisk } from '@/src/lib/deconfliction';
 import { logApiCall } from '@/src/lib/audit-logger';
 import type { SourcesData, OTXSourceData } from '@/src/db/schema';
+import { getLastSyncTimestamp, isConfiguredApiKey } from '@/src/lib/sync-status';
 
 export interface UserListItem {
   id: string;
@@ -271,35 +272,54 @@ export async function getThreatIntelStatus(): Promise<
     // Get last sync times from config
     const configs = await db.select()
       .from(systemConfig)
-      .where(eq(systemConfig.key, SYSTEM_CONFIG_KEYS.LAST_OTX_SYNC));
+      .where(
+        or(
+          eq(systemConfig.key, SYSTEM_CONFIG_KEYS.LAST_OTX_SYNC),
+          eq(systemConfig.key, SYSTEM_CONFIG_KEYS.LAST_ABUSEIPDB_SYNC)
+        )
+      );
 
     const otxLastSync = configs.find(c => c.key === SYSTEM_CONFIG_KEYS.LAST_OTX_SYNC);
+    const abuseLastSync = configs.find(c => c.key === SYSTEM_CONFIG_KEYS.LAST_ABUSEIPDB_SYNC);
 
-    // Get indicator counts by source
-    const abuseipdbCount = await db.select({ value: count() })
-      .from(threatLogs)
-      .where(eq(threatLogs.source, 'AbuseIPDB'));
-
-    const otxCount = await db.select({ value: count() })
-      .from(threatLogs)
-      .where(eq(threatLogs.source, 'OTX'));
-
-    // Get last AbuseIPDB sync from threat_logs
-    const abuseipdbLastSync = await db.select({ value: max(threatLogs.createdAt) })
-      .from(threatLogs)
-      .where(eq(threatLogs.source, 'AbuseIPDB'));
+    const [abuseipdbCount, otxCount, abuseipdbLastSync, otxThreatLastSync] = await Promise.all([
+      db.select({ value: count() })
+        .from(threatLogs)
+        .where(or(
+          eq(threatLogs.source, 'AbuseIPDB'),
+          sql`${threatLogs.sourcesData} -> 'abuseipdb' is not null`
+        )),
+      db.select({ value: count() })
+        .from(threatLogs)
+        .where(or(
+          eq(threatLogs.source, 'OTX'),
+          sql`${threatLogs.sourcesData} -> 'otx' is not null`
+        )),
+      db.select({ value: max(threatLogs.createdAt) })
+        .from(threatLogs)
+        .where(eq(threatLogs.source, 'AbuseIPDB')),
+      db.select({ value: max(threatLogs.createdAt) })
+        .from(threatLogs)
+        .where(eq(threatLogs.source, 'OTX')),
+    ]);
 
     const sources: SyncStatusInfo[] = [
       {
         source: 'AbuseIPDB',
-        enabled: !!process.env.ABUSEIPDB_API_KEY,
-        lastSync: abuseipdbLastSync[0]?.value?.toISOString() ?? null,
+        enabled: isConfiguredApiKey(process.env.ABUSEIPDB_API_KEY),
+        lastSync: getLastSyncTimestamp(
+          abuseLastSync?.updatedAt,
+          abuseipdbLastSync[0]?.value
+        )?.toISOString() ?? null,
         indicatorCount: Number(abuseipdbCount[0]?.value ?? 0),
       },
       {
         source: 'OTX',
-        enabled: !!process.env.OTX_API_KEY,
-        lastSync: otxLastSync?.updatedAt?.toISOString() ?? null,
+        enabled: isConfiguredApiKey(process.env.OTX_API_KEY),
+        lastSync: getLastSyncTimestamp(
+          otxLastSync?.updatedAt,
+          otxThreatLastSync[0]?.value
+        )?.toISOString() ?? null,
         indicatorCount: Number(otxCount[0]?.value ?? 0),
       },
     ];
@@ -320,7 +340,7 @@ export async function triggerAbuseIPDBSync(): Promise<TriggerSyncResult> {
     return { success: false, source: 'AbuseIPDB', error: authResult.error };
   }
 
-  if (!process.env.ABUSEIPDB_API_KEY) {
+  if (!isConfiguredApiKey(process.env.ABUSEIPDB_API_KEY)) {
     return { success: false, source: 'AbuseIPDB', error: 'ABUSEIPDB_API_KEY not configured' };
   }
 
@@ -331,18 +351,19 @@ export async function triggerAbuseIPDBSync(): Promise<TriggerSyncResult> {
       process.env.THREAT_INGESTION_SECRET
     );
 
-    // Update last sync timestamp
-    await db.insert(systemConfig)
-      .values({
-        key: SYSTEM_CONFIG_KEYS.LAST_ABUSEIPDB_SYNC,
-        value: true,
-        description: 'Last AbuseIPDB sync timestamp',
-        updatedBy: authResult.session.user.id,
-      })
-      .onConflictDoUpdate({
-        target: systemConfig.key,
-        set: { updatedAt: new Date(), updatedBy: authResult.session.user.id },
-      });
+    if (result.success) {
+      await db.insert(systemConfig)
+        .values({
+          key: SYSTEM_CONFIG_KEYS.LAST_ABUSEIPDB_SYNC,
+          value: true,
+          description: 'Last AbuseIPDB sync timestamp',
+          updatedBy: authResult.session.user.id,
+        })
+        .onConflictDoUpdate({
+          target: systemConfig.key,
+          set: { updatedAt: new Date(), updatedBy: authResult.session.user.id },
+        });
+    }
 
     return {
       success: result.success,
@@ -366,7 +387,7 @@ export async function triggerOTXSync(): Promise<TriggerSyncResult> {
     return { success: false, source: 'OTX', error: authResult.error };
   }
 
-  if (!process.env.OTX_API_KEY) {
+  if (!isConfiguredApiKey(process.env.OTX_API_KEY)) {
     return { success: false, source: 'OTX', error: 'OTX_API_KEY not configured' };
   }
 
