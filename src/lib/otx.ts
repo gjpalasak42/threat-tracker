@@ -5,6 +5,8 @@
  * @see https://otx.alienvault.com/api
  */
 
+import { isConfiguredApiKey } from './sync-status';
+
 const OTX_BASE_URL = 'https://otx.alienvault.com';
 
 // =============================================================================
@@ -145,7 +147,7 @@ export interface RateLimitInfo {
 
 function getApiKey(): string {
   const key = process.env.OTX_API_KEY;
-  if (!key) {
+  if (!isConfiguredApiKey(key)) {
     throw new Error(
       'OTX_API_KEY environment variable is not set. ' +
       'Get a free API key at https://otx.alienvault.com/api'

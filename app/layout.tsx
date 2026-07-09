@@ -1,19 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
+import { Geist, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { HeaderAuth } from "@/components/header-auth";
 
-const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-sans'});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
@@ -28,23 +26,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${jetbrainsMono.variable} dark`}>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="en" className={`${geistSans.variable} ${jetbrainsMono.variable} dark`}>
+      <body className="antialiased">
         <SidebarProvider>
           <AppSidebar />
           <SidebarInset>
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+            <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-4 sm:px-6">
               <SidebarTrigger className="-ml-1" />
-              <div className="h-4 w-px bg-border" />
-              <span className="text-xs text-muted-foreground">Security Operations Center</span>
-              {/* Spacer to push auth to the right */}
+              <div className="hidden h-4 w-px bg-border sm:block" />
+              <span className="hidden whitespace-nowrap text-xs text-muted-foreground sm:inline">
+                Security Operations Center
+              </span>
               <div className="flex-1" />
-              {/* User auth section */}
               <HeaderAuth />
             </header>
-            <main className="flex-1 overflow-auto p-4">
+            <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
               {children}
             </main>
           </SidebarInset>

@@ -55,13 +55,10 @@ export function PulsePageClient({ initialThreats }: PulsePageClientProps) {
       // Keep alive, status already connected
     });
 
-    eventSource.addEventListener('error', () => {
-      setSseStatus('error');
-    });
-
     eventSource.onerror = () => {
       setSseStatus('disconnected');
-      eventSource.close();
+      // Keep EventSource open so the browser can use its built-in retry loop.
+      // A later `connected` event restores the live state automatically.
     };
 
     return () => {

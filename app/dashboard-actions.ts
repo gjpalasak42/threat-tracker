@@ -9,6 +9,7 @@
 import { db } from '@/src/db/db';
 import { threatLogs, systemConfig, SYSTEM_CONFIG_KEYS } from '@/src/db/schema';
 import { count, max, eq, or } from 'drizzle-orm';
+import { getLastSyncTimestamp, isConfiguredApiKey } from '@/src/lib/sync-status';
 
 export interface DashboardMetrics {
   totalRecords: number;
@@ -64,33 +65,31 @@ export async function getSyncStatus(): Promise<SyncStatus> {
     const abuseConfig = configs.find(c => c.key === SYSTEM_CONFIG_KEYS.LAST_ABUSEIPDB_SYNC);
 
     // Get last sync time for AbuseIPDB - prefer config entry, fallback to threat_logs
-    let abuseLastSync = abuseConfig?.updatedAt?.toISOString() ?? null;
-    if (!abuseLastSync) {
-      // Fallback: check most recent AbuseIPDB indicator in threat_logs
-      const lastEntry = await db.select({ value: max(threatLogs.createdAt) })
-        .from(threatLogs)
-        .where(eq(threatLogs.source, 'AbuseIPDB'));
-      abuseLastSync = lastEntry[0]?.value?.toISOString() ?? null;
-    }
+    const abuseLastEntry = await db.select({ value: max(threatLogs.createdAt) })
+      .from(threatLogs)
+      .where(eq(threatLogs.source, 'AbuseIPDB'));
+    const abuseLastSync = getLastSyncTimestamp(
+      abuseConfig?.updatedAt,
+      abuseLastEntry[0]?.value
+    )?.toISOString() ?? null;
 
     // Get last sync time for OTX - prefer config entry, fallback to threat_logs
-    let otxLastSync = otxConfig?.updatedAt?.toISOString() ?? null;
-    if (!otxLastSync) {
-      // Fallback: check most recent OTX indicator in threat_logs
-      const lastEntry = await db.select({ value: max(threatLogs.createdAt) })
-        .from(threatLogs)
-        .where(eq(threatLogs.source, 'OTX'));
-      otxLastSync = lastEntry[0]?.value?.toISOString() ?? null;
-    }
+    const otxLastEntry = await db.select({ value: max(threatLogs.createdAt) })
+      .from(threatLogs)
+      .where(eq(threatLogs.source, 'OTX'));
+    const otxLastSync = getLastSyncTimestamp(
+      otxConfig?.updatedAt,
+      otxLastEntry[0]?.value
+    )?.toISOString() ?? null;
 
     return {
       abuseipdb: {
         lastSync: abuseLastSync,
-        enabled: !!process.env.ABUSEIPDB_API_KEY,
+        enabled: isConfiguredApiKey(process.env.ABUSEIPDB_API_KEY),
       },
       otx: {
         lastSync: otxLastSync,
-        enabled: !!process.env.OTX_API_KEY,
+        enabled: isConfiguredApiKey(process.env.OTX_API_KEY),
       },
     };
   } catch (error) {
@@ -101,4 +100,3 @@ export async function getSyncStatus(): Promise<SyncStatus> {
     };
   }
 }
-

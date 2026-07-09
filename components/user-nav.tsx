@@ -59,32 +59,33 @@ export function UserNav({ user }: UserNavProps) {
   const displayName = user.name || user.email?.split('@')[0] || 'User';
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex min-w-0 items-center gap-1 sm:gap-2 lg:gap-3">
       {/* Role badges */}
       {user.role === 'ADMIN' && (
-        <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/30 gap-1">
+        <Badge variant="outline" className="hidden bg-red-500/10 text-red-400 border-red-500/30 gap-1 lg:inline-flex">
           <Shield className="w-3 h-3" />
           Admin
         </Badge>
       )}
       
       {(user.role === 'API_USER' || user.role === 'ADMIN') && (
-        <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 gap-1">
+        <Badge variant="outline" className="hidden bg-blue-500/10 text-blue-400 border-blue-500/30 gap-1 lg:inline-flex">
           <Zap className="w-3 h-3" />
           API Access
         </Badge>
       )}
 
       {/* User greeting */}
-      <span className="text-sm text-muted-foreground">
+      <span className="hidden text-sm text-muted-foreground xl:inline">
         Hello, <span className="text-foreground font-medium">{displayName}</span>
       </span>
 
       {/* Admin panel link */}
       {user.role === 'ADMIN' && (
         <Link href="/admin">
-          <Button variant="ghost" size="sm">
-            Admin Panel
+          <Button variant="ghost" size="sm" aria-label="Admin panel" className="gap-1.5">
+            <Shield className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Admin</span>
           </Button>
         </Link>
       )}
@@ -102,10 +103,11 @@ export function UserNav({ user }: UserNavProps) {
         variant="ghost" 
         size="sm" 
         onClick={handleSignOut}
+        aria-label="Sign out"
         className="gap-1.5 text-muted-foreground hover:text-foreground"
       >
         <LogOut className="w-3.5 h-3.5" />
-        Sign Out
+        <span className="hidden sm:inline">Sign Out</span>
       </Button>
     </div>
   );

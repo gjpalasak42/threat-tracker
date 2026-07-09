@@ -8,7 +8,8 @@ import { describe, it, expect } from 'bun:test';
 import { 
   loginSchema, 
   signupSchema, 
-  normalizeEmail 
+  normalizeEmail,
+  getSafeInternalPath,
 } from '../validations/auth';
 
 describe('Auth Validation Schemas', () => {
@@ -23,6 +24,21 @@ describe('Auth Validation Schemas', () => {
 
     it('should handle mixed case with whitespace', () => {
       expect(normalizeEmail('  Test@EXAMPLE.com  ')).toBe('test@example.com');
+    });
+  });
+
+  describe('getSafeInternalPath', () => {
+    it('preserves local paths with query strings and fragments', () => {
+      expect(getSafeInternalPath('/investigate?ip=8.8.8.8#result')).toBe('/investigate?ip=8.8.8.8#result');
+    });
+
+    it('rejects absolute and protocol-relative external URLs', () => {
+      expect(getSafeInternalPath('https://example.com/steal', '/')).toBe('/');
+      expect(getSafeInternalPath('//example.com/steal', '/')).toBe('/');
+    });
+
+    it('rejects slash-prefixed backslash URLs normalized as external', () => {
+      expect(getSafeInternalPath('/\\example.com/steal', '/')).toBe('/');
     });
   });
 

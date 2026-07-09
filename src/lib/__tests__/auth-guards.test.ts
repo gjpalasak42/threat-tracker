@@ -5,26 +5,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-
-// Import only the pure utility functions to avoid database initialization
-// Note: hasPermission is a pure function that doesn't require db/auth imports
-type UserRole = 'ADMIN' | 'API_USER' | 'STANDARD_USER';
-
-const ROLE_HIERARCHY: UserRole[] = ['STANDARD_USER', 'API_USER', 'ADMIN'];
-
-function getRoleLevel(role: UserRole): number {
-  return ROLE_HIERARCHY.indexOf(role);
-}
-
-function hasPermission(userRole: UserRole, requiredRole: UserRole): boolean {
-  return getRoleLevel(userRole) >= getRoleLevel(requiredRole);
-}
-
-const KILL_SWITCH_KEYS = {
-  REGISTRATION_ENABLED: 'registration_enabled',
-  EXTERNAL_API_ENABLED: 'external_api_enabled',
-  DATABASE_SEARCH_ENABLED: 'database_search_enabled',
-} as const;
+import { hasPermission, KILL_SWITCH_KEYS } from '../auth-guards';
 
 describe('Auth Guards', () => {
   describe('hasPermission', () => {
@@ -52,11 +33,12 @@ describe('Auth Guards', () => {
       expect(KILL_SWITCH_KEYS.REGISTRATION_ENABLED).toBe('registration_enabled');
       expect(KILL_SWITCH_KEYS.EXTERNAL_API_ENABLED).toBe('external_api_enabled');
       expect(KILL_SWITCH_KEYS.DATABASE_SEARCH_ENABLED).toBe('database_search_enabled');
+      expect(KILL_SWITCH_KEYS.OTX_SYNC_ENABLED).toBe('otx_sync_enabled');
     });
 
-    it('should have exactly 3 kill switch keys', () => {
+    it('should have exactly 4 kill switch keys', () => {
       const keys = Object.keys(KILL_SWITCH_KEYS);
-      expect(keys).toHaveLength(3);
+      expect(keys).toHaveLength(4);
     });
   });
 });

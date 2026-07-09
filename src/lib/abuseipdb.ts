@@ -6,6 +6,7 @@
  */
 
 import { isIP } from 'net';
+import { isConfiguredApiKey } from './sync-status';
 
 const ABUSEIPDB_BASE_URL = 'https://api.abuseipdb.com/api/v2';
 
@@ -67,7 +68,7 @@ export interface AbuseIPDBError {
 
 function getApiKey(): string {
   const key = process.env.ABUSEIPDB_API_KEY;
-  if (!key) {
+  if (!isConfiguredApiKey(key)) {
     throw new Error(
       'ABUSEIPDB_API_KEY environment variable is not set. ' +
       'Please configure it in your .env file.'

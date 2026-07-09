@@ -15,6 +15,29 @@ export function normalizeEmail(email: string): string {
 }
 
 /**
+ * Resolve an authentication callback to an application-local path.
+ * URL parsing also rejects slash-prefixed backslash forms that browsers can
+ * otherwise normalize into a protocol-relative external URL.
+ */
+export function getSafeInternalPath(
+  candidate: string | null | undefined,
+  fallback: string = '/'
+): string {
+  if (!candidate) return fallback;
+
+  const localOrigin = 'https://threat-tracker.invalid';
+
+  try {
+    const parsed = new URL(candidate, localOrigin);
+    if (parsed.origin !== localOrigin) return fallback;
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
  * Login form validation schema
  */
 export const loginSchema = z.object({

@@ -100,7 +100,7 @@ export default function InvestigatePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={(e) => handleSubmit(e, false)} className="flex gap-2">
+          <form onSubmit={(e) => handleSubmit(e, false)} className="flex flex-col gap-2 sm:flex-row">
             <Input
               type="text"
               placeholder="e.g., 8.8.8.8"
@@ -109,7 +109,7 @@ export default function InvestigatePage() {
               className="flex-1 font-mono"
               disabled={isPending}
             />
-            <Button type="submit" disabled={isPending || !ipAddress.trim()}>
+            <Button type="submit" disabled={isPending || !ipAddress.trim()} className="sm:w-auto">
               {isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -163,8 +163,8 @@ export default function InvestigatePage() {
       {result?.success && result.data && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <CardTitle className="font-mono">{result.data.ipAddress}</CardTitle>
                 {/* Cache Indicator */}
                 {result.fromCache ? (

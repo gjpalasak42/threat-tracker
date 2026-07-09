@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ingestFromAbuseIPDB } from '@/app/threats/actions';
 import { db } from '@/src/db/db';
-import { threatLogs } from '@/src/db/schema';
-import { max } from 'drizzle-orm';
+import { systemConfig, SYSTEM_CONFIG_KEYS, threatLogs } from '@/src/db/schema';
+import { eq, max } from 'drizzle-orm';
+import { getLastSyncTimestamp, isConfiguredApiKey, shouldThrottleSync } from '@/src/lib/sync-status';
 
 /**
  * Sync Endpoint for Cron Job
@@ -36,27 +37,39 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check last sync time to enforce rate limiting
-  const lastSyncResult = await db
-    .select({ lastSync: max(threatLogs.createdAt) })
-    .from(threatLogs);
+  if (!isConfiguredApiKey(process.env.ABUSEIPDB_API_KEY)) {
+    return NextResponse.json(
+      { error: 'ABUSEIPDB_API_KEY not configured' },
+      { status: 503 }
+    );
+  }
 
-  const lastSyncTime = lastSyncResult[0]?.lastSync;
+  // Check source-specific last sync time to enforce rate limiting.
+  const [configResult, lastSyncResult] = await Promise.all([
+    db.select({ updatedAt: systemConfig.updatedAt })
+      .from(systemConfig)
+      .where(eq(systemConfig.key, SYSTEM_CONFIG_KEYS.LAST_ABUSEIPDB_SYNC))
+      .limit(1),
+    db.select({ lastSync: max(threatLogs.createdAt) })
+      .from(threatLogs)
+      .where(eq(threatLogs.source, 'AbuseIPDB')),
+  ]);
 
-  if (lastSyncTime) {
-    const timeSinceLastSync = Date.now() - new Date(lastSyncTime).getTime();
-    
-    if (timeSinceLastSync < MIN_SYNC_INTERVAL_MS) {
-      const hoursRemaining = Math.ceil((MIN_SYNC_INTERVAL_MS - timeSinceLastSync) / (60 * 60 * 1000));
-      return NextResponse.json(
-        { 
-          error: 'Rate limit: Sync too recent',
-          message: `Please wait ${hoursRemaining} more hours before next sync`,
-          lastSyncTime: lastSyncTime.toISOString(),
-        },
-        { status: 429 }
-      );
-    }
+  const lastSyncTime = getLastSyncTimestamp(
+    configResult[0]?.updatedAt,
+    lastSyncResult[0]?.lastSync
+  );
+
+  const throttle = shouldThrottleSync(lastSyncTime, new Date(), MIN_SYNC_INTERVAL_MS);
+  if (throttle.throttled) {
+    return NextResponse.json(
+      {
+        error: 'Rate limit: Sync too recent',
+        message: `Please wait ${throttle.hoursRemaining} more hours before next sync`,
+        lastSyncTime: lastSyncTime?.toISOString(),
+      },
+      { status: 429 }
+    );
   }
 
   // Perform ingestion
@@ -76,6 +89,19 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Record the successful attempt even when every indicator was already in
+    // the database. Threat row timestamps alone cannot represent sync health.
+    await db.insert(systemConfig)
+      .values({
+        key: SYSTEM_CONFIG_KEYS.LAST_ABUSEIPDB_SYNC,
+        value: true,
+        description: 'Last successful AbuseIPDB sync timestamp',
+      })
+      .onConflictDoUpdate({
+        target: systemConfig.key,
+        set: { updatedAt: new Date() },
+      });
 
     return NextResponse.json({
       success: true,
